@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2024 Nicolai Brand (https://lytix.dev)
+ *  Copyright (C) 2024-2025 Nicolai Brand (https://lytix.dev)
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -14,12 +14,30 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef GEN_H
-#define GEN_H
+#ifndef VM_H
+#define VM_H
 
-#include "compiler.h"
-#include "type.h"
+#include "compiler/comptime/bytecode.h"
 
-void transpile_to_c(Compiler *compiler);
+#define STACK_MAX 1024
 
-#endif /* TYPE_H */
+typedef enum {
+    VM_FLAG_NEG = 1 << 0,
+    VM_FLAG_ZERO = 1 << 1,
+} VMFlags;
+
+typedef struct {
+    Bytecode b;
+    u8 *ip;
+
+    BytecodeWord stack[STACK_MAX];
+    u8 *sp;
+    u8 bp;
+
+    VMFlags flags;
+} MetagenVM;
+
+
+u32 run(Bytecode b);
+
+#endif /* VM_H */

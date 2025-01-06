@@ -57,17 +57,14 @@ struct User {
 ```
 
 ### Towards a prototype
-- Currently, the prototype uses an extension of the VSL syntax:
-    - Added struct support
-    - Strongly typed
 - Will transpile to C
-- Simple tree-walk interpreter to run functions at compile-time.
+- Simple stack-based vm to run functions at compile-time.
 
 ### Status
-- [x] Lex
-- [x] Parse
-- [ ] Type & symbol gen
-- [ ] Typecheck
-- [ ] Transpiling to C
-- [ ] Tree-walk interpreter
+- [x] Frontend
+- [x] Type inference & Typecheck
+- [x] C backend
+- [ ] Bytecode backend
+- [ ] Compile-time execution
+- [ ] AST modification at compile-time
 
