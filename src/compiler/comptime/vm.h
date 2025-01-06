@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2024 Nicolai Brand (https://lytix.dev)
+ *  Copyright (C) 2024-2025 Nicolai Brand (https://lytix.dev)
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -17,11 +17,14 @@
 #ifndef VM_H
 #define VM_H
 
-
-#include "base/types.h"
 #include "compiler/comptime/bytecode.h"
 
 #define STACK_MAX 1024
+
+typedef enum {
+    VM_FLAG_NEG = 1 << 0,
+    VM_FLAG_ZERO = 1 << 1,
+} VMFlags;
 
 typedef struct {
     Bytecode b;
@@ -30,6 +33,8 @@ typedef struct {
     BytecodeWord stack[STACK_MAX];
     u8 *sp;
     u8 bp;
+
+    VMFlags flags;
 } MetagenVM;
 
 

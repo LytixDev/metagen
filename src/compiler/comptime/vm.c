@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2024 Nicolai Brand (https://lytix.dev)
+ *  Copyright (C) 2024-2025 Nicolai Brand (https://lytix.dev)
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,21 +16,20 @@
  */
 #include "compiler/comptime/vm.h"
 #include "compiler/comptime/bytecode.h"
-#include "compiler/type.h"
 #include <assert.h>
 #include <stdio.h>
 
 
 static BytecodeWord readw(MetagenVM *vm)
 {
-    BytecodeWord value = *vm->ip;
+    BytecodeWord value = *(BytecodeWord *)vm->ip;
     vm->ip += sizeof(BytecodeWord);
     return value;
 }
 
 static BytecodeImm readi(MetagenVM *vm)
 {
-    BytecodeImm value = *vm->ip;
+    BytecodeImm value = *(BytecodeImm *)vm->ip;
     vm->ip += sizeof(BytecodeImm);
     return value;
 }
@@ -51,14 +50,14 @@ static void pushn(MetagenVM *vm, BytecodeImm n)
 
 static void pushw(MetagenVM *vm, BytecodeWord value)
 {
-    *vm->sp = value;
+    *(BytecodeWord *)vm->sp = value;
     vm->sp += sizeof(BytecodeWord);
 }
 
 static BytecodeWord popw(MetagenVM *vm)
 {
     vm->sp -= sizeof(BytecodeWord);
-    return *vm->sp;
+    return *(BytecodeWord *)vm->sp;
 }
 
 static BytecodeWord popn(MetagenVM *vm, BytecodeImm n)
@@ -79,15 +78,18 @@ static void storew(MetagenVM *vm, BytecodeImm bp_offset, BytecodeWord value)
 
 u32 run(Bytecode b)
 {
-    MetagenVM vm = { .b = b, .ip = b.code };
+    MetagenVM vm;
+    vm.b = b;
+    vm.ip = b.code;
     vm.sp = (u8 *)vm.stack;
     vm.bp = 0;
+    vm.flags = 0;
 
     while (1) {
         // printf("%04ld\n", vm.ip - b.code);
         OpCode instruction;
         switch (instruction = *vm.ip++) {
-        case OP_CONSTANTW: {
+        case OP_CONSW: {
             BytecodeWord value = readw(&vm);
             pushw(&vm, value);
         }; break;
@@ -111,6 +113,22 @@ u32 run(Bytecode b)
         case OP_RSHIFT:
             pushw(&vm, popw(&vm) >> popw(&vm));
             break;
+
+        case OP_JMP:
+            vm.ip = b.code + popw(&vm);
+            break;
+        case OP_BIZ: {
+            BytecodeImm imm = readi(&vm);
+            if (popw(&vm) == 0) {
+                vm.ip += imm;
+            }
+        }; break;
+        case OP_BNZ: {
+            BytecodeImm imm = readi(&vm);
+            if (popw(&vm) != 0) {
+                vm.ip += imm;
+            }
+        }; break;
 
         case OP_PUSHN: {
             BytecodeImm n_words = readi(&vm);

@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2023-2024 Nicolai Brand (https://lytix.dev)
+ *  Copyright (C) 2024-2025 Nicolai Brand (https://lytix.dev)
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -81,8 +81,8 @@ u32 compile(char *input)
     ast_print((AstNode *)ast_root, 0);
     putchar('\n');
 
-    // Bytecode b = ast_to_bytecode(ast_root);
-    Bytecode bytecode = bytecode_test();
+    Bytecode bytecode = ast_to_bytecode(ast_root);
+    // Bytecode bytecode = fib_test();
     disassemble(bytecode);
     run(bytecode);
 

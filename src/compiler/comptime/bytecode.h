@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2024 Nicolai Brand (https://lytix.dev)
+ *  Copyright (C) 2024-2025 Nicolai Brand (https://lytix.dev)
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 #define BYTECODE_H
 
 
+#include "base/nicc.h"
 #include "base/types.h"
 #include "compiler/ast.h"
 
@@ -25,8 +26,6 @@ typedef s64 BytecodeWord;
 typedef u16 BytecodeImm;
 
 typedef enum {
-    OP_CONSTANTW,
-
     /* arithmetic */
     OP_ADDW,
     OP_SUBW,
@@ -35,11 +34,17 @@ typedef enum {
     OP_LSHIFT,
     OP_RSHIFT,
 
+    /* Branching */
+    OP_JMP, // pop and update ip
+    OP_BIZ, // pop and jump to imm if popped value is zero
+    OP_BNZ, // pop and jump to imm if popped value is not zero
+
     /* stack operations */
-    OP_PUSHN,
-    OP_POPN,
-    OP_LOADL,
-    OP_STOREL,
+    OP_CONSW, // push next word
+    OP_PUSHN, // make space for n words words
+    OP_POPN, // remove space for n words on
+    OP_LOADL, // push value at next imm + bp
+    OP_STOREL, // pop and store value at next imm + bp
 
     OP_PRINT,
     OP_RETURN,
@@ -53,14 +58,32 @@ extern char *op_code_str_map[OP_TYPE_LEN];
 
 typedef struct {
     // TODO: Pool allocated or something
-    u8 code[2048];
+    u8 code[4096];
     u32 code_offset;
 } Bytecode;
+
+typedef struct locals_t Locals;
+struct locals_t {
+    HashMap map; // Key: identfier, Value: offset + 1 (so we can use 0x0 as NULL).
+    Locals *parent;
+};
+
+typedef enum {
+    BCF_STORE_IDENT = 1,
+    BCF_LOAD_IDENT = 2,
+} BytecodeCompilerFlags;
+
+typedef struct {
+    Bytecode bytecode;
+    Locals *locals;
+    BytecodeCompilerFlags flags;
+} BytecodeCompiler;
 
 
 Bytecode ast_to_bytecode(AstRoot *root);
 void disassemble(Bytecode b);
 
 Bytecode bytecode_test(void);
+Bytecode fib_test(void);
 
 #endif /* BYTECODE_H */

@@ -61,10 +61,10 @@ struct User {
 - Simple stack-based vm to run functions at compile-time.
 
 ### Status
-- [x] Lex
-- [x] Parse
-- [x] Type & symbol gen
-- [x] Typecheck
-- [x] Transpiling to C
-- [ ] Stack-based vm for comptime execution
+- [x] Frontend
+- [x] Type inference & Typecheck
+- [x] C backend
+- [ ] Bytecode backend
+- [ ] Compile-time execution
+- [ ] AST modification at compile-time
 
