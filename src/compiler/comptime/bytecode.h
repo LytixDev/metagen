@@ -23,7 +23,7 @@
 #include "compiler/ast.h"
 
 typedef s64 BytecodeWord;
-typedef u16 BytecodeImm;
+typedef u16 BytecodeImm; // Value immeditely preceeding certain instructions 
 
 typedef enum {
     /* arithmetic */
@@ -64,7 +64,7 @@ typedef struct {
 
 typedef struct locals_t Locals;
 struct locals_t {
-    HashMap map; // Key: identfier, Value: offset + 1 (so we can use 0x0 as NULL).
+    HashMap map; // Key: Symbol identfier, Value: code_offset + 1 (so we can use 0x0 as NULL).
     Locals *parent;
 };
 
@@ -75,7 +75,7 @@ typedef enum {
 
 typedef struct {
     Bytecode bytecode;
-    Locals *locals;
+    Locals *locals; /* NOTE: Root Locals object also stores global functions and variables */
     BytecodeCompilerFlags flags;
 } BytecodeCompiler;
 
@@ -83,7 +83,6 @@ typedef struct {
 Bytecode ast_to_bytecode(AstRoot *root);
 void disassemble(Bytecode b);
 
-Bytecode bytecode_test(void);
 Bytecode fib_test(void);
 
 #endif /* BYTECODE_H */
