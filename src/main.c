@@ -46,21 +46,21 @@ bool run_compiler_pass(Compiler *c, AstRoot *root, CompilerPass pass)
 
 u32 compile(char *input)
 {
-    Arena arena;
     Arena lex_arena;
+    Arena persist_arena;
     Arena pass_arena;
-    m_arena_init_dynamic(&arena, 2, 512);
     m_arena_init_dynamic(&lex_arena, 1, 512);
+    m_arena_init_dynamic(&persist_arena, 2, 512);
     m_arena_init_dynamic(&pass_arena, 1, 512);
 
     ErrorHandler e;
     error_handler_init(&e, input, "test.meta");
 
-    Compiler compiler = { .persist_arena = &arena, .pass_arena = &pass_arena, .e = &e };
+    Compiler compiler = { .persist_arena = &persist_arena, .pass_arena = &pass_arena, .e = &e };
     arraylist_init(&compiler.struct_types, sizeof(TypeInfoStruct *));
     arraylist_init(&compiler.all_types, sizeof(TypeInfo *));
 
-    AstRoot *ast_root = parse(&arena, &lex_arena, &e, input);
+    AstRoot *ast_root = parse(&persist_arena, &lex_arena, &e, input);
     for (CompilerError *err = e.head; err != NULL; err = err->next) {
         printf("%s\n", err->msg.str);
     }
@@ -96,7 +96,7 @@ done:
     // anyways on the process terminating, so it doesn't really make a difference.
     // arraylist_free ...
     error_handler_release(&e);
-    m_arena_release(&arena);
+    m_arena_release(&persist_arena);
     m_arena_release(&lex_arena);
     return e.n_errors;
 }

@@ -22,8 +22,9 @@
 #include <stdio.h>
 
 char *op_code_str_map[OP_TYPE_LEN] = {
-    "OP_ADDW", "OP_SUBW",  "OP_MULW",  "OP_DIVW", "OP_LSHIFT", "OP_RSHIFT", "OP_JMP",   "OP_BIZ",
-    "OP_BNZ",  "OP_CONSW", "OP_PUSHN", "OP_POPN", "OP_LOADL",  "OP_STOREL", "OP_PRINT", "OP_RETURN",
+    "OP_ADDW", "OP_SUBW",  "OP_MULW",   "OP_DIVW",  "OP_LSHIFT", "OP_RSHIFT", "OP_GE",
+    "OP_LE",   "OP_NOT",   "OP_JMP",    "OP_BIZ",   "OP_BNZ",    "OP_CONSW",  "OP_PUSHN",
+    "OP_POPN", "OP_LOADL", "OP_STOREL", "OP_PRINT", "OP_RETURN",
 };
 
 
@@ -130,6 +131,14 @@ static void bytecode_compiler_init(BytecodeCompiler *compiler)
     compiler->locals = make_locals(NULL);
 }
 
+static void bytecode_compiler_free(BytecodeCompiler *compiler)
+{
+    for (Locals *locals = compiler->locals; locals; locals = locals->parent) {
+        hashmap_free(&locals->map);
+        free(locals);
+    }
+}
+
 static void ast_expr_to_bytecode(BytecodeCompiler *compiler, AstExpr *head)
 {
     switch (head->kind) {
@@ -140,8 +149,8 @@ static void ast_expr_to_bytecode(BytecodeCompiler *compiler, AstExpr *head)
         AstBinary *expr = AS_BINARY(head);
         // NOTE: we only support integers right now
         assert(expr->type->kind == TYPE_INTEGER);
-        ast_expr_to_bytecode(compiler, expr->left);
         ast_expr_to_bytecode(compiler, expr->right);
+        ast_expr_to_bytecode(compiler, expr->left);
         switch (expr->op) {
         default:
             printf("Binary op not handled\n");
@@ -149,8 +158,21 @@ static void ast_expr_to_bytecode(BytecodeCompiler *compiler, AstExpr *head)
         case TOKEN_PLUS:
             writeu8(&compiler->bytecode, OP_ADDW);
             break;
-        case TOKEN_LESS:
+        case TOKEN_MINUS:
             writeu8(&compiler->bytecode, OP_SUBW);
+            break;
+        case TOKEN_EQ:
+            writeu8(&compiler->bytecode, OP_SUBW);
+            writeu8(&compiler->bytecode, OP_NOT);
+            break;
+        case TOKEN_NEQ:
+            writeu8(&compiler->bytecode, OP_SUBW);
+            break;
+        case TOKEN_GREATER:
+            writeu8(&compiler->bytecode, OP_GE);
+            break;
+        case TOKEN_LESS:
+            writeu8(&compiler->bytecode, OP_LE);
             break;
         }
     } break;
@@ -166,7 +188,7 @@ static void ast_expr_to_bytecode(BytecodeCompiler *compiler, AstExpr *head)
         } else {
             printf("Ast literal expr kind not handled\n");
         }
-    }; break;
+    } break;
     };
 }
 
@@ -178,11 +200,35 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *compiler, AstStmt *head)
         break;
     case STMT_ASSIGNMENT: {
         AstAssignment *assignment = AS_ASSIGNMENT(head);
-        // store some value at some stack position
         ast_expr_to_bytecode(compiler, assignment->right);
         compiler->flags = BCF_STORE_IDENT;
         ast_expr_to_bytecode(compiler, assignment->left);
         compiler->flags = BCF_LOAD_IDENT;
+    } break;
+    case STMT_IF: {
+        AstIf *if_ = AS_IF(head);
+        u32 endif_target;
+        ast_expr_to_bytecode(compiler, if_->condition);
+        /* If false, jump to the else branch */
+        u32 else_target = writeu8(&compiler->bytecode, OP_BIZ);
+        writei(&compiler->bytecode, 0);
+        /* If branch */
+        ast_stmt_to_bytecode(compiler, if_->then);
+        /* Skip the else branch */
+        if (if_->else_) {
+            endif_target = writeu8(&compiler->bytecode, OP_CONSW);
+            writew(&compiler->bytecode, 0);
+            writeu8(&compiler->bytecode, OP_JMP);
+        }
+        /* Else branch */
+        patchi(&compiler->bytecode, else_target,
+               compiler->bytecode.code_offset - else_target - sizeof(BytecodeImm));
+        if (if_->else_) {
+            ast_stmt_to_bytecode(compiler, if_->else_);
+            /* Path the jump to end target */
+            patchw(&compiler->bytecode, endif_target, compiler->bytecode.code_offset);
+        }
+
     } break;
     case STMT_WHILE: {
         AstWhile *while_ = AS_WHILE(head);
@@ -203,24 +249,24 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *compiler, AstStmt *head)
     } break;
     case STMT_BLOCK: {
         AstBlock *block = AS_BLOCK(head);
-        // TODO: if the block defines no locals we can skip this
-        compiler->locals = make_locals(compiler->locals);
-
-        /* Make space for each local variable */
-        u32 var_space = 0;
-        SymbolTable *symt = block->symt_local;
-        for (u32 i = 0; i < symt->sym_len; i++) {
-            Symbol *sym = symt->symbols[i];
-            if (sym->kind == SYMBOL_LOCAL_VAR) {
-                hashmap_put(&compiler->locals->map, sym->name.str, sym->name.len,
-                            (void *)(compiler->bytecode.code_offset + var_space + 1),
-                            sizeof(void *), false);
-                // TODO: align?
-                var_space += type_info_bit_size(sym->type_info);
+        bool no_new_syms = block->symt_local->sym_len == 0;
+        u32 var_space_in_words = 0;
+        if (!no_new_syms) {
+            compiler->locals = make_locals(compiler->locals);
+            /* Make space for each local variable */
+            u32 var_space = 0;
+            SymbolTable *symt = block->symt_local;
+            for (u32 i = 0; i < symt->sym_len; i++) {
+                Symbol *sym = symt->symbols[i];
+                if (sym->kind == SYMBOL_LOCAL_VAR) {
+                    hashmap_put(&compiler->locals->map, sym->name.str, sym->name.len,
+                                (void *)(compiler->bytecode.code_offset + var_space + 1),
+                                sizeof(void *), false);
+                    // TODO: align? Question of performance.
+                    var_space += type_info_bit_size(sym->type_info);
+                }
             }
-        }
-        u32 var_space_in_words = (var_space + sizeof(BytecodeWord) - 1) / sizeof(BytecodeWord);
-        if (var_space_in_words != 0) {
+            var_space_in_words = (var_space + sizeof(BytecodeWord) - 1) / sizeof(BytecodeWord);
             writeu8(&compiler->bytecode, OP_PUSHN);
             writei(&compiler->bytecode, (BytecodeImm)var_space_in_words);
         }
@@ -230,15 +276,14 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *compiler, AstStmt *head)
             ast_stmt_to_bytecode(compiler, (AstStmt *)n->this);
         }
 
-        if (var_space_in_words != 0) {
+        if (!no_new_syms) {
             writeu8(&compiler->bytecode, OP_POPN);
             writei(&compiler->bytecode, (BytecodeImm)var_space_in_words);
+            Locals *old = compiler->locals;
+            compiler->locals = old->parent;
+            hashmap_free(&old->map);
+            free(old);
         }
-
-        Locals *old = compiler->locals;
-        compiler->locals = old->parent;
-        hashmap_free(&old->map);
-        free(old);
     } break;
     case STMT_PRINT: {
         AstList *stmt = AS_LIST(head);
@@ -265,55 +310,12 @@ Bytecode ast_to_bytecode(AstRoot *root)
     assert(root->funcs.head != NULL);
     BytecodeCompiler compiler;
     bytecode_compiler_init(&compiler);
+
     ast_func_to_bytecode(&compiler, AS_FUNC(root->funcs.head->this));
+
+    bytecode_compiler_free(&compiler);
     return compiler.bytecode;
 }
-
-Bytecode bytecode_test(void)
-{
-    /*
-     * var a: s32, b: s32, c: s32
-     * a = 1
-     * b = 2
-     * c = a + b
-     * print c
-     */
-    Bytecode b = { 0 };
-
-    writeu8(&b, OP_PUSHN);
-    writei(&b, 3);
-
-    // a = 1
-    writeu8(&b, OP_CONSW);
-    writew(&b, 1);
-    writeu8(&b, OP_STOREL);
-    writei(&b, 0);
-
-    // b = 2
-    writeu8(&b, OP_CONSW);
-    writew(&b, 2);
-    writeu8(&b, OP_STOREL);
-    writei(&b, 1);
-
-    // c = a + b
-    writeu8(&b, OP_LOADL);
-    writei(&b, 1);
-    writeu8(&b, OP_LOADL);
-    writei(&b, 0);
-    writeu8(&b, OP_ADDW);
-    writeu8(&b, OP_STOREL);
-    writei(&b, 2);
-
-    // print c
-    writeu8(&b, OP_LOADL);
-    writei(&b, 2);
-    writeu8(&b, OP_PRINT);
-    writeu8(&b, 1);
-
-    writeu8(&b, OP_RETURN);
-    return b;
-}
-
 
 Bytecode fib_test(void)
 {

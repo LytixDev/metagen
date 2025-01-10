@@ -209,7 +209,7 @@ static void gen_expr(Compiler *compiler, AstExpr *head)
             fprintf(f, "<");
             break;
         case TOKEN_GREATER:
-            fprintf(f, "<");
+            fprintf(f, ">");
             break;
         default:
             ASSERT_NOT_REACHED;
@@ -276,7 +276,7 @@ static void gen_stmt(Compiler *compiler, AstStmt *head, u32 indent)
         gen_stmt(compiler, stmt->then, indent + 2);
         if (stmt->else_) {
             write_newline_and_indent(indent);
-            fprintf(f, "} else ");
+            fprintf(f, "} else {");
             gen_stmt(compiler, stmt->else_, indent + 2);
         }
         write_newline_and_indent(indent);
