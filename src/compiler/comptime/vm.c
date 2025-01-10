@@ -76,17 +76,17 @@ static void storew(MetagenVM *vm, BytecodeImm bp_offset, BytecodeWord value)
     vm->stack[vm->bp + bp_offset] = value;
 }
 
-u32 run(Bytecode b)
+u32 run(Bytecode bytecode)
 {
     MetagenVM vm;
-    vm.b = b;
-    vm.ip = b.code;
+    vm.b = bytecode;
+    vm.ip = bytecode.code;
     vm.sp = (u8 *)vm.stack;
     vm.bp = 0;
     vm.flags = 0;
 
     while (1) {
-        // printf("%04ld\n", vm.ip - b.code);
+        // printf(">%d %s\n", vm.ip - bytecode.code, op_code_str_map[*vm.ip]);
         OpCode instruction;
         switch (instruction = *vm.ip++) {
         case OP_CONSW: {
@@ -113,40 +113,49 @@ u32 run(Bytecode b)
         case OP_RSHIFT:
             pushw(&vm, popw(&vm) >> popw(&vm));
             break;
+        case OP_GE:
+            pushw(&vm, popw(&vm) > popw(&vm));
+            break;
+        case OP_LE:
+            pushw(&vm, popw(&vm) < popw(&vm));
+            break;
+        case OP_NOT:
+            pushw(&vm, !popw(&vm));
+            break;
 
         case OP_JMP:
-            vm.ip = b.code + popw(&vm);
+            vm.ip = bytecode.code + popw(&vm);
             break;
         case OP_BIZ: {
-            BytecodeImm imm = readi(&vm);
+            BytecodeImm target = readi(&vm);
             if (popw(&vm) == 0) {
-                vm.ip += imm;
+                vm.ip += target;
             }
-        }; break;
+        } break;
         case OP_BNZ: {
-            BytecodeImm imm = readi(&vm);
+            BytecodeImm target = readi(&vm);
             if (popw(&vm) != 0) {
-                vm.ip += imm;
+                vm.ip += target;
             }
-        }; break;
+        } break;
 
         case OP_PUSHN: {
             BytecodeImm n_words = readi(&vm);
             pushn(&vm, n_words);
-        }; break;
+        } break;
         case OP_POPN: {
             BytecodeImm n_words = readi(&vm);
             popn(&vm, n_words);
-        }; break;
+        } break;
         case OP_STOREL: {
             BytecodeImm bp_offset = readi(&vm);
             BytecodeWord value = popw(&vm);
             storew(&vm, bp_offset, value);
-        }; break;
+        } break;
         case OP_LOADL: {
             BytecodeImm bp_offset = readi(&vm);
             pushw(&vm, loadw(&vm, bp_offset));
-        }; break;
+        } break;
 
         case OP_PRINT: {
             u8 n_args = read_u8(&vm);
@@ -160,7 +169,7 @@ u32 run(Bytecode b)
                 printf("%ld ", args[i - 1]);
             }
             printf("\n");
-        }; break;
+        } break;
 
         case OP_RETURN: {
             goto vm_loop_done;

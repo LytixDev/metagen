@@ -23,7 +23,7 @@
 #include "compiler/ast.h"
 
 typedef s64 BytecodeWord;
-typedef u16 BytecodeImm; // Value immeditely preceeding certain instructions 
+typedef u16 BytecodeImm; // Value immeditely preceeding certain instructions
 
 typedef enum {
     /* arithmetic */
@@ -33,11 +33,14 @@ typedef enum {
     OP_DIVW,
     OP_LSHIFT,
     OP_RSHIFT,
+    OP_GE, // pop a and pop b. Push 1 if a >= b
+    OP_LE, // pop a and pop b. Push 1 if a =< b
+    OP_NOT,
 
     /* Branching */
-    OP_JMP, // pop and update ip
-    OP_BIZ, // pop and jump to imm if popped value is zero
-    OP_BNZ, // pop and jump to imm if popped value is not zero
+    OP_JMP, // pop and uppdate ip
+    OP_BIZ, // pop and add imm to ip if popped value is zero
+    OP_BNZ, // pop and add imm to ip if popped value is not zero
 
     /* stack operations */
     OP_CONSW, // push next word

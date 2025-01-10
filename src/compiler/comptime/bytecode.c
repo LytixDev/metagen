@@ -22,8 +22,9 @@
 #include <stdio.h>
 
 char *op_code_str_map[OP_TYPE_LEN] = {
-    "OP_ADDW", "OP_SUBW",  "OP_MULW",  "OP_DIVW", "OP_LSHIFT", "OP_RSHIFT", "OP_JMP",   "OP_BIZ",
-    "OP_BNZ",  "OP_CONSW", "OP_PUSHN", "OP_POPN", "OP_LOADL",  "OP_STOREL", "OP_PRINT", "OP_RETURN",
+    "OP_ADDW", "OP_SUBW",  "OP_MULW",   "OP_DIVW",  "OP_LSHIFT", "OP_RSHIFT", "OP_GE",
+    "OP_LE",   "OP_NOT",   "OP_JMP",    "OP_BIZ",   "OP_BNZ",    "OP_CONSW",  "OP_PUSHN",
+    "OP_POPN", "OP_LOADL", "OP_STOREL", "OP_PRINT", "OP_RETURN",
 };
 
 
@@ -148,8 +149,8 @@ static void ast_expr_to_bytecode(BytecodeCompiler *compiler, AstExpr *head)
         AstBinary *expr = AS_BINARY(head);
         // NOTE: we only support integers right now
         assert(expr->type->kind == TYPE_INTEGER);
-        ast_expr_to_bytecode(compiler, expr->left);
         ast_expr_to_bytecode(compiler, expr->right);
+        ast_expr_to_bytecode(compiler, expr->left);
         switch (expr->op) {
         default:
             printf("Binary op not handled\n");
@@ -157,8 +158,21 @@ static void ast_expr_to_bytecode(BytecodeCompiler *compiler, AstExpr *head)
         case TOKEN_PLUS:
             writeu8(&compiler->bytecode, OP_ADDW);
             break;
-        case TOKEN_LESS:
+        case TOKEN_MINUS:
             writeu8(&compiler->bytecode, OP_SUBW);
+            break;
+        case TOKEN_EQ:
+            writeu8(&compiler->bytecode, OP_SUBW);
+            writeu8(&compiler->bytecode, OP_NOT);
+            break;
+        case TOKEN_NEQ:
+            writeu8(&compiler->bytecode, OP_SUBW);
+            break;
+        case TOKEN_GREATER:
+            writeu8(&compiler->bytecode, OP_GE);
+            break;
+        case TOKEN_LESS:
+            writeu8(&compiler->bytecode, OP_LE);
             break;
         }
     } break;
@@ -186,11 +200,35 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *compiler, AstStmt *head)
         break;
     case STMT_ASSIGNMENT: {
         AstAssignment *assignment = AS_ASSIGNMENT(head);
-        // store some value at some stack position
         ast_expr_to_bytecode(compiler, assignment->right);
         compiler->flags = BCF_STORE_IDENT;
         ast_expr_to_bytecode(compiler, assignment->left);
         compiler->flags = BCF_LOAD_IDENT;
+    } break;
+    case STMT_IF: {
+        AstIf *if_ = AS_IF(head);
+        u32 endif_target;
+        ast_expr_to_bytecode(compiler, if_->condition);
+        /* If false, jump to the else branch */
+        u32 else_target = writeu8(&compiler->bytecode, OP_BIZ);
+        writei(&compiler->bytecode, 0);
+        /* If branch */
+        ast_stmt_to_bytecode(compiler, if_->then);
+        /* Skip the else branch */
+        if (if_->else_) {
+            endif_target = writeu8(&compiler->bytecode, OP_CONSW);
+            writew(&compiler->bytecode, 0);
+            writeu8(&compiler->bytecode, OP_JMP);
+        }
+        /* Else branch */
+        patchi(&compiler->bytecode, else_target,
+               compiler->bytecode.code_offset - else_target - sizeof(BytecodeImm));
+        if (if_->else_) {
+            ast_stmt_to_bytecode(compiler, if_->else_);
+            /* Path the jump to end target */
+            patchw(&compiler->bytecode, endif_target, compiler->bytecode.code_offset);
+        }
+
     } break;
     case STMT_WHILE: {
         AstWhile *while_ = AS_WHILE(head);
