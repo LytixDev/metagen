@@ -21,9 +21,24 @@
 #include "base/nicc.h"
 #include "base/types.h"
 #include "compiler/ast.h"
+#include "compiler/type.h"
 
 typedef s64 BytecodeWord;
 typedef u16 BytecodeImm; // Value immeditely preceeding certain instructions
+
+/*
+ * Function prologue:
+ * - Push old base pointer (bp)
+ * - Load current stack pointer into base pointer
+ * - Allocate space for paramaters on the stack stack
+ * - Fill the parameters with correct values
+ * - Jump to function
+ *
+ * Function epilogue:
+ * - Deallocate paramaters
+ * - Load old base pointer
+ * - Push return value (if present)
+ */
 
 typedef enum {
     /* arithmetic */
@@ -77,13 +92,14 @@ typedef enum {
 } BytecodeCompilerFlags;
 
 typedef struct {
+    SymbolTable symt_root;
     Bytecode bytecode;
     Locals *locals; /* NOTE: Root Locals object also stores global functions and variables */
     BytecodeCompilerFlags flags;
 } BytecodeCompiler;
 
 
-Bytecode ast_to_bytecode(AstRoot *root);
+Bytecode ast_to_bytecode(SymbolTable symt_root, AstRoot *root);
 void disassemble(Bytecode b);
 
 Bytecode fib_test(void);

@@ -79,7 +79,7 @@ void error_parse(ErrorHandler *e, char *msg, Token guilty)
     Str8Builder sb = make_str_builder(&e->arena);
     str_builder_sprintf(&sb, "[%s @ line %d] ", 2, e->file_name, guilty.end);
     str_builder_append_cstr(&sb, msg, strlen(msg));
-    Str8 str = str_builder_end(&sb, false);
+    Str8 str = str_builder_end(&sb, true);
     append_err(e, str);
 }
 

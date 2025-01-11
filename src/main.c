@@ -81,7 +81,7 @@ u32 compile(char *input)
     ast_print((AstNode *)ast_root, 0);
     putchar('\n');
 
-    Bytecode bytecode = ast_to_bytecode(ast_root);
+    Bytecode bytecode = ast_to_bytecode(compiler.symt_root, ast_root);
     // Bytecode bytecode = fib_test();
     disassemble(bytecode);
     run(bytecode);
