@@ -11,6 +11,7 @@ end
 --- EXPECT ---
 AST_ROOT
  AST_LIST
+ AST_LIST
   AST_FUNC name=main parameters=
    STMT_BLOCK vars=x: s32, y: s32, z: s32
     AST_LIST
@@ -59,3 +60,6 @@ AST_ROOT
        op: RSHIFT
        EXPR_LITERAL x
        EXPR_LITERAL 1
+ AST_LIST
+ AST_LIST
+ AST_LIST

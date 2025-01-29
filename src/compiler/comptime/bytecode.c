@@ -124,8 +124,9 @@ static BytecodeImm find_ident_offset(BytecodeCompiler *compiler, Str8 ident)
     ASSERT_NOT_REACHED;
 }
 
-static void bytecode_compiler_init(BytecodeCompiler *compiler)
+static void bytecode_compiler_init(BytecodeCompiler *compiler, SymbolTable symt_root)
 {
+    compiler->symt_root = symt_root;
     compiler->flags = BCF_LOAD_IDENT;
     compiler->bytecode.code_offset = 0;
     compiler->locals = make_locals(NULL);
@@ -301,89 +302,36 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *compiler, AstStmt *head)
 void ast_func_to_bytecode(BytecodeCompiler *compiler, AstFunc *func)
 {
     assert(func->body != NULL);
+    Symbol *sym = symt_find_sym(&compiler->symt_root, func->name);
+    assert(sym != NULL && sym->kind == SYMBOL_FUNC);
+
+    SymbolTable params = sym->symt_local;
+    u32 params_space = 0;
+    // for (u32 i = 0; i < params.sym_len; i++) {
+    //     Symbol *param = params.symbols[i];
+    //     hashmap_put(&compiler->locals->map, param->name.str, param->name.len,
+    //                 (void *)(compiler->bytecode.code_offset + params_space + 1),
+    //                 sizeof(void *), false);
+    //     params_space += type_info_bit_size(param->type_info);
+    // }
+
+
     ast_stmt_to_bytecode(compiler, func->body);
+
+    /* Function epilogue */
     writeu8(&compiler->bytecode, OP_RETURN);
 }
 
-Bytecode ast_to_bytecode(AstRoot *root)
+Bytecode ast_to_bytecode(SymbolTable symt_root, AstRoot *root)
 {
     assert(root->funcs.head != NULL);
     BytecodeCompiler compiler;
-    bytecode_compiler_init(&compiler);
+    bytecode_compiler_init(&compiler, symt_root);
 
-    ast_func_to_bytecode(&compiler, AS_FUNC(root->funcs.head->this));
+    for (AstListNode *node = root->funcs.head; node != NULL; node = node->next) {
+        ast_func_to_bytecode(&compiler, AS_FUNC(node->this));
+    }
 
     bytecode_compiler_free(&compiler);
     return compiler.bytecode;
-}
-
-Bytecode fib_test(void)
-{
-    /*
-    func fib(n: s32): s32
-    begin
-        if n = 0 then return 0
-        if n = 1 then return 1
-        return fib(n - 1) + fib(n - 2)
-    end
-
-    func main(): s32
-    begin
-        print fib(20)
-        return 0
-    end
-    */
-
-    Bytecode b = { 0 };
-    /*
-       var i: s32
-        i := 0
-        while i < 10 do
-        begin
-            print i
-            i := i + 1
-        end
-     */
-
-    // var i: s32
-    writeu8(&b, OP_PUSHN);
-    writei(&b, 1);
-    // i := 0
-    writeu8(&b, OP_CONSW);
-    writew(&b, 0);
-    writeu8(&b, OP_STOREL);
-    writei(&b, 0);
-
-    // i < 10 -> 10 - i == 0
-    u32 if_start = b.code_offset;
-    writeu8(&b, OP_LOADL);
-    writei(&b, 0);
-    writeu8(&b, OP_CONSW);
-    writew(&b, 10);
-    writeu8(&b, OP_SUBW);
-    u32 else_target = writeu8(&b, OP_BIZ);
-    writei(&b, 0);
-
-    // print i
-    writeu8(&b, OP_LOADL);
-    writei(&b, 0);
-    writeu8(&b, OP_PRINT);
-    writeu8(&b, 1);
-
-    // i := i + 1
-    writeu8(&b, OP_LOADL);
-    writei(&b, 0);
-    writeu8(&b, OP_CONSW);
-    writew(&b, 1);
-    writeu8(&b, OP_ADDW);
-    writeu8(&b, OP_STOREL);
-    writei(&b, 0);
-
-    writeu8(&b, OP_CONSW);
-    writew(&b, (BytecodeWord)if_start);
-    writeu8(&b, OP_JMP);
-    patchi(&b, else_target, b.code_offset - else_target - sizeof(BytecodeImm));
-
-    writeu8(&b, OP_RETURN);
-    return b;
 }

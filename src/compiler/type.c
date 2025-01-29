@@ -465,6 +465,11 @@ static TypeInfo *typecheck_expr(Compiler *c, SymbolTable *symt_local, AstExpr *h
             head->type = typecheck_expr(c, &type_sym->symt_local, expr->right);
             break;
         }
+        /* Array indexing */
+        if (expr->op == TOKEN_LBRACKET) {
+            assert(left->kind == TYPE_ARRAY);
+            left = ((TypeInfoArray *)left)->element_type;
+        }
 
         /* Regular binary operator */
         TypeInfo *right = typecheck_expr(c, symt_local, expr->right);

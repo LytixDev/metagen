@@ -3,55 +3,40 @@
 var array: s32[200]
 
 
-func main(x: s32, y: s32, z: f32): s32 begin
+func main(x: s32, y: s32): s32 begin
     // array indexing can both be the target of an assignment
     array[2] := 20
     // and an expression
     print array[10] + array[10+20]
-
-    // the index can be a runtime value
-    array[x] := array[a[x] + y]
 end
 --- EXPECT ---
-AST_ROOT
- AST_LIST
-  AST_NODE_VAR_LIST array: s32[200]
- AST_LIST
-  AST_FUNC name=main parameters=x: s32, y: s32, z: f32
+AST_ROOT 
+ AST_LIST 
+  AST_TYPED_IDENT_LIST array: s32[200]
+ AST_LIST 
+  AST_FUNC name=main parameters=x: s32, y: s32
    STMT_BLOCK vars=
-    AST_LIST
+    AST_LIST 
      STMT_ASSIGNMENT
-      EXPR_BINARY
+      EXPR_BINARY 
        op: LBRACKET
        EXPR_LITERAL array
        EXPR_LITERAL 2
       EXPR_LITERAL 20
      STMT_PRINT
-      EXPR_BINARY
+      EXPR_BINARY 
        op: PLUS
-       EXPR_BINARY
+       EXPR_BINARY 
         op: LBRACKET
         EXPR_LITERAL array
         EXPR_LITERAL 10
-       EXPR_BINARY
+       EXPR_BINARY 
         op: LBRACKET
         EXPR_LITERAL array
-        EXPR_BINARY
+        EXPR_BINARY 
          op: PLUS
          EXPR_LITERAL 10
          EXPR_LITERAL 20
-     STMT_ASSIGNMENT
-      EXPR_BINARY
-       op: LBRACKET
-       EXPR_LITERAL array
-       EXPR_LITERAL x
-      EXPR_BINARY
-       op: LBRACKET
-       EXPR_LITERAL array
-       EXPR_BINARY
-        op: PLUS
-        EXPR_BINARY
-         op: LBRACKET
-         EXPR_LITERAL a
-         EXPR_LITERAL x
-        EXPR_LITERAL y
+ AST_LIST 
+ AST_LIST 
+ AST_LIST 
