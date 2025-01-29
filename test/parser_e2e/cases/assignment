@@ -15,7 +15,7 @@ end
 --- EXPECT ---
 AST_ROOT
  AST_LIST
-  AST_NODE_VAR_LIST array: s32[10]
+  AST_TYPED_IDENT_LIST array: s32[10]
  AST_LIST
   AST_FUNC name=main parameters=
    STMT_BLOCK vars=a: s32
@@ -31,3 +31,6 @@ AST_ROOT
       EXPR_LITERAL 2
      STMT_PRINT
       EXPR_LITERAL a
+ AST_LIST
+ AST_LIST
+ AST_LIST

@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2023-2024 Nicolai Brand (https://lytix.dev)
+ *  Copyright (C) 2023-2025 Nicolai Brand (https://lytix.dev)
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -310,11 +310,6 @@ void ast_print_stmt(AstStmt *head, u32 indent)
         AstBlock *stmt = AS_BLOCK(head);
         printf(" vars=");
         ast_print_typed_var_list(stmt->declarations);
-        printf(" syms=");
-        for (u32 i = 0; i < stmt->symt_local->sym_len; i++) {
-            Symbol *sym = stmt->symt_local->symbols[i];
-            printf("(%s, %d) ", sym->name.str, sym->seq_no);
-        }
         ast_print((AstNode *)stmt->stmts, indent + 1);
     }; break;
     case STMT_ASSIGNMENT: {

@@ -81,10 +81,9 @@ u32 compile(char *input)
     ast_print((AstNode *)ast_root, 0);
     putchar('\n');
 
-    Bytecode bytecode = ast_to_bytecode(compiler.symt_root, ast_root);
-    // Bytecode bytecode = fib_test();
-    disassemble(bytecode);
-    run(bytecode);
+    // Bytecode bytecode = ast_to_bytecode(compiler.symt_root, ast_root);
+    // disassemble(bytecode);
+    // run(bytecode);
 
     transpile_to_c(&compiler);
 
@@ -95,6 +94,32 @@ done:
     // We could be "good citizens" and release the memory here, but the OS is going to do it
     // anyways on the process terminating, so it doesn't really make a difference.
     // arraylist_free ...
+    error_handler_release(&e);
+    m_arena_release(&persist_arena);
+    m_arena_release(&lex_arena);
+    return e.n_errors;
+}
+
+u32 run_standalone_parser(char *input)
+{
+    Arena lex_arena;
+    Arena persist_arena;
+    Arena pass_arena;
+    m_arena_init_dynamic(&lex_arena, 1, 512);
+    m_arena_init_dynamic(&persist_arena, 2, 512);
+    m_arena_init_dynamic(&pass_arena, 1, 512);
+
+    ErrorHandler e;
+    error_handler_init(&e, input, "test.meta");
+
+    AstRoot *ast_root = parse(&persist_arena, &lex_arena, &e, input);
+    for (CompilerError *err = e.head; err != NULL; err = err->next) {
+        printf("%s\n", err->msg.str);
+    }
+
+    ast_print((AstNode *)ast_root, 0);
+    putchar('\n');
+
     error_handler_release(&e);
     m_arena_release(&persist_arena);
     m_arena_release(&lex_arena);
@@ -117,8 +142,14 @@ int main(void)
         i++;
     }
 
-    u32 n_errors = compile(input);
-    if (n_errors == 0)
+    u32 n_errors = 0;
+#ifdef BUILD_STANDALONE_PARSER
+    n_errors = run_standalone_parser(input);
+#else
+    n_errors = compile(input);
+#endif
+    if (n_errors == 0) {
         return 0;
+    }
     return 1;
 }
