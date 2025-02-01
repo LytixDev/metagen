@@ -134,9 +134,11 @@ static void bytecode_compiler_init(BytecodeCompiler *compiler, SymbolTable symt_
 
 static void bytecode_compiler_free(BytecodeCompiler *compiler)
 {
-    for (Locals *locals = compiler->locals; locals; locals = locals->parent) {
+    for (Locals *locals = compiler->locals; locals != NULL;) {
         hashmap_free(&locals->map);
-        free(locals);
+        Locals *old = locals;
+        locals = locals->parent;
+        free(old);
     }
 }
 
