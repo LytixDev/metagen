@@ -14,8 +14,9 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#include <getopt.h>
 #include <stdio.h>
+#include <getopt.h>
+#include <sys/stat.h>
 
 #include "compiler/ast.h"
 #include "compiler/codegen/gen.h"
@@ -154,19 +155,39 @@ int main(int argc, char *argv[])
             return EXIT_FAILURE;
         }
     }
-
-    Arena input_arena;
-    m_arena_init_dynamic(&input_arena, 1, 512);
-    char *input = m_arena_alloc_zero(&input_arena, 4096);
-    char c;
-    u32 i = 0;
-    while ((c = getchar()) != EOF) {
-        if (i >= input_arena.pages_commited * 4096) {
-            m_arena_alloc_zero(&input_arena, 4096);
-        }
-        input[i] = c;
-        i++;
+    
+    /* Check if there are any remaining input arguments (used as the input file) */
+    char *input_file;
+    if (optind < argc) {
+        input_file = argv[optind];
+    } else {
+        fprintf(stderr, "Error: No input file specified.\n");
+        return EXIT_FAILURE;
     }
+
+    /* Read input file in its entirety */
+    struct stat st;
+    if (stat(input_file, &st) != 0) {
+        fprintf(stderr, "Error: Could not find file '%s'.\n", input_file);
+        return EXIT_FAILURE;
+    }
+    size_t input_size = st.st_size;
+    char *input = malloc(sizeof(char) * (input_size + 1));
+    input[input_size] = 0;
+    FILE *fp = fopen(input_file, "r");
+    if (fp == NULL) {
+        fprintf(stderr, "Error: Could not open file '%s'.\n", input_file);
+        free(input);
+        fclose(fp);
+        return EXIT_FAILURE;
+    }
+    if (fread(input, sizeof(char), st.st_size, fp) != input_size) {
+        fprintf(stderr, "Error: Could not read file '%s'.\n", input_file);
+        free(input);
+        fclose(fp);
+        return EXIT_FAILURE;
+    }
+    fclose(fp);
 
     u32 n_errors = compile(input);
     if (n_errors == 0) {
