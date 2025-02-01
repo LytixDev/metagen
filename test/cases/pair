@@ -1,12 +1,14 @@
---- GIVEN ---
-struct Pair := a: s32, b: f32
+--- SOURCE ---
+struct Pair := a: s32, b: s32
 
 func main(): s32
 begin
     var pair: Pair
-    pair := Pair(10, 20)
+    pair.a := 10
+    print pair.a
+    //pair := Pair(10, 20)
 end
---- EXPECT ---
+--- TREE ---
 AST_ROOT
  AST_LIST
  AST_LIST
@@ -14,12 +16,19 @@ AST_ROOT
    STMT_BLOCK vars=pair: Pair
     AST_LIST
      STMT_ASSIGNMENT
-      EXPR_LITERAL pair
-      EXPR_CALL Pair
-       AST_LIST
-        EXPR_LITERAL 10
-        EXPR_LITERAL 20
+      EXPR_BINARY
+       op: DOT
+       EXPR_LITERAL pair
+       EXPR_LITERAL a
+      EXPR_LITERAL 10
+     STMT_PRINT
+      EXPR_BINARY
+       op: DOT
+       EXPR_LITERAL pair
+       EXPR_LITERAL a
  AST_LIST
-  AST_STRUCT name=Pair members=a: s32, b: f32
+  AST_STRUCT name=Pair members=a: s32, b: s32
  AST_LIST
  AST_LIST
+--- OUTPUT ---
+10

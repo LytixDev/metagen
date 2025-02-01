@@ -1,4 +1,4 @@
---- GIVEN ---
+--- SOURCE ---
 func fib(n: s32): s32
 begin
     if n = 0 then return 0
@@ -15,7 +15,7 @@ begin
 
     return 0
 end
---- EXPECT ---
+--- TREE ---
 AST_ROOT 
  AST_LIST 
  AST_LIST 
@@ -66,3 +66,5 @@ AST_ROOT
  AST_LIST 
  AST_LIST 
  AST_LIST 
+--- OUTPUT ---
+6765

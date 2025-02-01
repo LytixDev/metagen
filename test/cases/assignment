@@ -1,4 +1,4 @@
---- GIVEN ---
+--- SOURCE ---
 // checking that comments are ignored
 
 // This program checks the assignment operator
@@ -12,7 +12,7 @@ begin
     array[2] := 2
     print a
 end
---- EXPECT ---
+--- TREE ---
 AST_ROOT
  AST_LIST
   AST_TYPED_IDENT_LIST array: s32[10]
@@ -34,3 +34,5 @@ AST_ROOT
  AST_LIST
  AST_LIST
  AST_LIST
+--- OUTPUT ---
+3

@@ -8,29 +8,48 @@ loop file in $files {
     printf '\033[94mCheck %s:\033[0m\n' $file
     var content = (cat $file)
     
-    var given  = (echo $content | sed -n '/^--- GIVEN ---$/,/^--- EXPECT ---$/p' | sed '1d;$d')
-    var expect = (echo $content | sed -n '/^--- EXPECT ---$/,$p' | sed '1d')
+    var source  = (echo $content | sed -n '/^--- SOURCE ---$/,/^--- TREE ---$/p' | sed '1d;$d')
+    var tree  = (echo $content | sed -n '/^--- TREE ---$/,/^--- OUTPUT ---$/p' | sed '1d;$d')
+    var output = (echo $content | sed -n '/^--- OUTPUT ---$/,$p' | sed '1d')
 
-    var actual = (echo $given | ./metagenc -p)
+    var tree_actual = (echo $source | ./metagenc -p)
+    var output_actual = (echo $source | ./metagenc)
+    # TODO: check bytecode output also
     
     # Make temporary files
-    var expect_file = (mktemp)
-    var actual_file = (mktemp)
+    var tree_file = (mktemp)
+    var tree_actual_file = (mktemp)
+    var output_file = (mktemp)
+    var output_actual_file = (mktemp)
     
-    echo $expect > $expect_file
-    echo $actual > $actual_file
+    echo $tree > $tree_file
+    echo $tree_actual > $tree_actual_file
+    echo $output > $output_file
+    echo $output_actual > $output_actual_file
     
-    # Compare expected vs actual using diff. -Z to ignore trailing whitespace.
-    diff -Z $actual_file $expect_file
-    if $? == 0 {
+    # -Z to ignore trailing whitespace.
+    diff -Z $tree_actual_file $tree_file
+    var failed = false
+    if $? != 0 {
+        printf '\033[91mDifferent syntax tree!\033[0m\n\n'
+        $failed = true
+    } 
+
+    diff -Z $output_actual_file $output_file
+    if $? != 0 {
+        printf '\033[91mDifferent output!\033[0m\n\n'
+        $failed = true
+    } 
+    
+    if $failed == false {
         $successes += 1
         printf '\033[92mSucceeded\033[0m\n\n'
-    } else {
-        printf '\033[91mFailed\033[0m\n\n'
     }
     
     # Remove temporary files
-    rm $expect_file $actual_file
+    rm $tree_file $tree_actual_file $output_file $output_actual_file
 }
 
 echo $successes "out of" $tests "tests succeeded"
+
+rm out.c a.out

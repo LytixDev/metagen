@@ -1,4 +1,4 @@
---- GIVEN ---
+--- SOURCE ---
 var array: s32[64]
 
 func main(): s32 begin
@@ -7,7 +7,7 @@ func main(): s32 begin
     array[2] := 3
     print array[0] + array[1] + array[1+1]
 end
---- EXPECT ---
+--- TREE ---
 AST_ROOT 
  AST_LIST 
   AST_TYPED_IDENT_LIST array: s32[64]
@@ -56,3 +56,5 @@ AST_ROOT
  AST_LIST 
  AST_LIST 
  AST_LIST 
+--- OUTPUT ---
+6
