@@ -1,0 +1,34 @@
+--- SOURCE ---
+struct Pair := a: s32, b: s32
+
+func main(): s32
+begin
+    var pair: Pair
+    pair.a := 10
+    print pair.a
+    //pair := Pair(10, 20)
+end
+--- TREE ---
+AST_ROOT
+ AST_LIST
+ AST_LIST
+  AST_FUNC name=main parameters=
+   STMT_BLOCK vars=pair: Pair
+    AST_LIST
+     STMT_ASSIGNMENT
+      EXPR_BINARY
+       op: DOT
+       EXPR_LITERAL pair
+       EXPR_LITERAL a
+      EXPR_LITERAL 10
+     STMT_PRINT
+      EXPR_BINARY
+       op: DOT
+       EXPR_LITERAL pair
+       EXPR_LITERAL a
+ AST_LIST
+  AST_STRUCT name=Pair members=a: s32, b: s32
+ AST_LIST
+ AST_LIST
+--- OUTPUT ---
+10

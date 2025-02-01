@@ -1,0 +1,55 @@
+#!/usr/local/bin/slash
+
+var files = (find "cases/" -type f)
+var successes = 0
+var tests = (echo $files | wc -l)
+
+loop file in $files {
+    printf '\033[94mCheck %s:\033[0m\n' $file
+    var content = (cat $file)
+    
+    var source  = (echo $content | sed -n '/^--- SOURCE ---$/,/^--- TREE ---$/p' | sed '1d;$d')
+    var tree  = (echo $content | sed -n '/^--- TREE ---$/,/^--- OUTPUT ---$/p' | sed '1d;$d')
+    var output = (echo $content | sed -n '/^--- OUTPUT ---$/,$p' | sed '1d')
+
+    var tree_actual = (echo $source | ./metagenc -p)
+    var output_actual = (echo $source | ./metagenc)
+    # TODO: check bytecode output also
+    
+    # Make temporary files
+    var tree_file = (mktemp)
+    var tree_actual_file = (mktemp)
+    var output_file = (mktemp)
+    var output_actual_file = (mktemp)
+    
+    echo $tree > $tree_file
+    echo $tree_actual > $tree_actual_file
+    echo $output > $output_file
+    echo $output_actual > $output_actual_file
+    
+    # -Z to ignore trailing whitespace.
+    diff -Z $tree_actual_file $tree_file
+    var failed = false
+    if $? != 0 {
+        printf '\033[91mDifferent syntax tree!\033[0m\n\n'
+        $failed = true
+    } 
+
+    diff -Z $output_actual_file $output_file
+    if $? != 0 {
+        printf '\033[91mDifferent output!\033[0m\n\n'
+        $failed = true
+    } 
+    
+    if $failed == false {
+        $successes += 1
+        printf '\033[92mSucceeded\033[0m\n\n'
+    }
+    
+    # Remove temporary files
+    rm $tree_file $tree_actual_file $output_file $output_actual_file
+}
+
+echo $successes "out of" $tests "tests succeeded"
+
+rm out.c a.out

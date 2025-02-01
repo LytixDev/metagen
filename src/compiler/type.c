@@ -590,30 +590,30 @@ static void typecheck_stmt(Compiler *c, SymbolTable *symt_local, TypeInfoFunc *p
 }
 
 /* --- PRINT --- */
-static void symt_print(SymbolTable symt)
-{
-    for (u32 i = 0; i < symt.sym_len; i++) {
-        Symbol *sym = symt.symbols[i];
-        TypeInfo *sym_type = sym->type_info;
-        if (sym_type == NULL) {
-            printf("[T%d:no%d] - %s\n", sym->kind, sym->seq_no, sym->name.str);
-        } else {
-            bool is_ptr = sym_type->kind == TYPE_POINTER;
-            bool is_array = false;
-            if (sym_type->kind == TYPE_ARRAY) {
-                is_array = true;
-                is_ptr = ((TypeInfoArray *)sym_type)->element_type->kind == TYPE_POINTER;
-            }
-            printf("[T%d:no%d] - %s: %s%s%s\n", sym->kind, sym->seq_no, sym->name.str,
-                   is_ptr ? "^" : "", sym_type->generated_by.str, is_array ? "[]" : "");
-        }
-        if (sym_generates_type(sym)) {
-            printf("local syms:\n");
-            symt_print(sym->symt_local);
-            putchar('\n');
-        }
-    }
-}
+// static void symt_print(SymbolTable symt)
+//{
+//     for (u32 i = 0; i < symt.sym_len; i++) {
+//         Symbol *sym = symt.symbols[i];
+//         TypeInfo *sym_type = sym->type_info;
+//         if (sym_type == NULL) {
+//             printf("[T%d:no%d] - %s\n", sym->kind, sym->seq_no, sym->name.str);
+//         } else {
+//             bool is_ptr = sym_type->kind == TYPE_POINTER;
+//             bool is_array = false;
+//             if (sym_type->kind == TYPE_ARRAY) {
+//                 is_array = true;
+//                 is_ptr = ((TypeInfoArray *)sym_type)->element_type->kind == TYPE_POINTER;
+//             }
+//             printf("[T%d:no%d] - %s: %s%s%s\n", sym->kind, sym->seq_no, sym->name.str,
+//                    is_ptr ? "^" : "", sym_type->generated_by.str, is_array ? "[]" : "");
+//         }
+//         if (sym_generates_type(sym)) {
+//             printf("local syms:\n");
+//             symt_print(sym->symt_local);
+//             putchar('\n');
+//         }
+//     }
+// }
 
 static void graph_add_edges_from_struct_type(Arena *pass_arena, NAG_Graph *graph, TypeInfoStruct *t)
 {

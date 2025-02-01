@@ -1,4 +1,4 @@
---- GIVEN ---
+--- SOURCE ---
 func add(a: s32, b: s32): s32 begin
     return a + b
 end
@@ -7,7 +7,7 @@ func main(): s32
 begin
     print add(40, 2)
 end
---- EXPECT ---
+--- TREE ---
 AST_ROOT
  AST_LIST
  AST_LIST
@@ -30,3 +30,5 @@ AST_ROOT
  AST_LIST
  AST_LIST
  AST_LIST
+--- OUTPUT ---
+42

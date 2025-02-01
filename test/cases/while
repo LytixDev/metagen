@@ -1,4 +1,4 @@
---- GIVEN ---
+--- SOURCE ---
 func main(): s32
 begin   
     var i: s32
@@ -7,7 +7,7 @@ begin
         i := i * i
     print i
 end
---- EXPECT ---
+--- TREE ---
 AST_ROOT 
  AST_LIST 
  AST_LIST 
@@ -33,3 +33,5 @@ AST_ROOT
  AST_LIST 
  AST_LIST 
  AST_LIST 
+--- OUTPUT ---
+65536
