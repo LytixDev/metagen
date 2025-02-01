@@ -15,6 +15,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include <stdio.h>
+#include <unistd.h>
 
 #include "compiler/ast.h"
 #include "compiler/codegen/gen.h"
@@ -30,6 +31,16 @@
 #include "base/nicc.h"
 #define SAC_IMPLEMENTATION
 #include "base/sac_single.h"
+
+
+typedef struct {
+    u32 log_level; /* 0: Only log erros. 1: Log warnings. 2: Log everything. */
+    bool parse_only; /* Stops after parsing and prints the syntax tree */
+    bool bytecode_backend; /* Emits bytecode instead of the default C backend */
+    bool run_bytecode; /* Treat the input as bytecode and run it */
+} MetagenOptions;
+
+MetagenOptions options = { 0 };
 
 
 typedef void (*CompilerPass)(Compiler *c, AstRoot *root);
@@ -127,8 +138,42 @@ u32 run_standalone_parser(char *input)
 }
 
 
-int main(void)
+int main(int argc, char *argv[])
 {
+    /*
+     * Arg parse :
+     * option range description
+     * -l     0-2   Log level
+     * -p           Parse only. Prints the syntax tree.
+     * -b           Emits bytecode instead of the default C backend.
+     * -r           Treat the input as bytecode and run it. If used with -b then it runs the
+     *              bytecode directly.
+     */
+    int opt;
+    while ((opt = getopt(argc, argv, "l:pbr")) != -1) {
+        switch (opt) {
+        case 'l': {
+            int log_level = atoi(optarg);
+            if (log_level < 0 || log_level > 2) {
+                fprintf(stderr, "Error: Log level must be between 0 and 2.\n");
+                return EXIT_FAILURE;
+            }
+        } break;
+        case 'p':
+            options.parse_only = true;
+            break;
+        case 'b':
+            options.bytecode_backend = true;
+            break;
+        case 'r':
+            options.run_bytecode = true;
+            break;
+        case '?':
+            fprintf(stderr, "Error: Bad usage.\n");
+            return EXIT_FAILURE;
+        }
+    }
+
     Arena input_arena;
     m_arena_init_dynamic(&input_arena, 1, 512);
     char *input = m_arena_alloc_zero(&input_arena, 4096);
