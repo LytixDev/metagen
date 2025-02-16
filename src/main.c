@@ -58,24 +58,24 @@ bool run_compiler_pass(Compiler *c, AstRoot *root, CompilerPass pass, char *name
     return c->e->n_errors > 0;
 }
 
-u32 compile(char *input)
+u32 compile(char *file_name, char *input)
 {
     Arena lex_arena;
-    Arena persist_arena;
-    Arena pass_arena;
+    Arena persist_arena; /* Data which should persist throughout the lifetime of the compiler */
+    Arena pass_arena; /* Data which that needs to persist for the lifetime of a compiler pass */
     m_arena_init_dynamic(&lex_arena, 1, 512);
     m_arena_init_dynamic(&persist_arena, 2, 512);
     m_arena_init_dynamic(&pass_arena, 1, 512);
 
     ErrorHandler e;
-    error_handler_init(&e, input, "test.meta");
+    error_handler_init(&e, input, file_name);
 
     Compiler compiler = { .persist_arena = &persist_arena, .pass_arena = &pass_arena, .e = &e };
     arraylist_init(&compiler.struct_types, sizeof(TypeInfoStruct *));
     arraylist_init(&compiler.all_types, sizeof(TypeInfo *));
 
     /* Frontend */
-    AstRoot *ast_root = parse(&persist_arena, &lex_arena, &e, input);
+    AstRoot *ast_root = parse(&persist_arena, &persist_arena, &e, input);
     for (CompilerError *err = e.head; err != NULL; err = err->next) {
         printf("%s\n", err->msg.str);
     }
@@ -201,7 +201,7 @@ int main(int argc, char *argv[])
     }
     fclose(fp);
 
-    u32 n_errors = compile(input);
+    u32 n_errors = compile(input_file, input);
     free(input);
     if (n_errors == 0) {
         return 0;

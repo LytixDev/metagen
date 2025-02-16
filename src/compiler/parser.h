@@ -24,7 +24,6 @@
 
 typedef struct {
     Arena *arena; // Allocator for all dynamic allocations performed by the parser
-    Arena *lex_arena;
     Lexer lexer;
     /*
      * When unlex is true we do not invoke the lexer in lex_next() and instead return
