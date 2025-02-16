@@ -8,12 +8,15 @@ loop file in $files {
     printf '\033[94mCheck %s:\033[0m\n' $file
     var content = (cat $file)
     
-    var source  = (echo $content | sed -n '/^--- SOURCE ---$/,/^--- TREE ---$/p' | sed '1d;$d')
-    var tree  = (echo $content | sed -n '/^--- TREE ---$/,/^--- OUTPUT ---$/p' | sed '1d;$d')
+    var source = (echo $content | sed -n '/^--- SOURCE ---$/,/^--- TREE ---$/p' | sed '1d;$d')
+    var tree = (echo $content | sed -n '/^--- TREE ---$/,/^--- OUTPUT ---$/p' | sed '1d;$d')
     var output = (echo $content | sed -n '/^--- OUTPUT ---$/,$p' | sed '1d')
 
-    var tree_actual = (echo $source | ./metagenc -p)
-    var output_actual = (echo $source | ./metagenc)
+
+    var source_file = (mktemp)
+    echo $source > $source_file
+    var tree_actual = (./metagenc -p $source_file)
+    var output_actual = (./metagenc $source_file)
     # TODO: check bytecode output also
     
     # Make temporary files

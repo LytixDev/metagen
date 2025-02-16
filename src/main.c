@@ -75,7 +75,7 @@ u32 compile(char *file_name, char *input)
     arraylist_init(&compiler.all_types, sizeof(TypeInfo *));
 
     /* Frontend */
-    AstRoot *ast_root = parse(&persist_arena, &persist_arena, &e, input);
+    AstRoot *ast_root = parse(&persist_arena, &lex_arena, &e, input);
     for (CompilerError *err = e.head; err != NULL; err = err->next) {
         printf("%s\n", err->msg.str);
     }
