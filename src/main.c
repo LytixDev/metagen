@@ -14,8 +14,8 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#include <stdio.h>
 #include <getopt.h>
+#include <stdio.h>
 #include <sys/stat.h>
 
 #include "compiler/ast.h"
@@ -27,6 +27,7 @@
 #include "compiler/parser.h"
 #include "compiler/type.h"
 
+#include "base/log.h"
 #include "base/str.h"
 #define NICC_IMPLEMENTATION
 #include "base/nicc.h"
@@ -46,8 +47,9 @@ MetagenOptions options = { 0 };
 
 typedef void (*CompilerPass)(Compiler *c, AstRoot *root);
 
-bool run_compiler_pass(Compiler *c, AstRoot *root, CompilerPass pass)
+bool run_compiler_pass(Compiler *c, AstRoot *root, CompilerPass pass, char *name)
 {
+    LOG_DEBUG("Running compiler pass '%s'", name);
     m_arena_clear(c->pass_arena);
     pass(c, root);
     for (CompilerError *err = c->e->head; err != NULL; err = err->next) {
@@ -77,6 +79,7 @@ u32 compile(char *input)
     for (CompilerError *err = e.head; err != NULL; err = err->next) {
         printf("%s\n", err->msg.str);
     }
+    LOG_DEBUG("Parsing complete, %d errors", e.n_errors);
     if (e.n_errors != 0) {
         goto done;
     }
@@ -87,29 +90,34 @@ u32 compile(char *input)
     }
 
     /* Middle end */
-    if (run_compiler_pass(&compiler, ast_root, typegen)) {
+    if (run_compiler_pass(&compiler, ast_root, typegen, "typegen")) {
         goto done;
     }
-    if (run_compiler_pass(&compiler, ast_root, infer)) {
+    if (run_compiler_pass(&compiler, ast_root, infer, "type infer")) {
         goto done;
     }
-    if (run_compiler_pass(&compiler, ast_root, typecheck)) {
+    if (run_compiler_pass(&compiler, ast_root, typecheck, "typecheck")) {
         goto done;
     }
 
     /* Backend */
     if (options.bytecode_backend && options.run_bytecode) {
+        LOG_DEBUG_NOARG("Generating bytecode");
         Bytecode bytecode = ast_to_bytecode(compiler.symt_root, ast_root);
         // disassemble(bytecode);
         run(bytecode);
     } else {
+        LOG_DEBUG_NOARG("Generating c-code");
         transpile_to_c(&compiler);
-        system("gcc out.c && ./a.out");
+        LOG_DEBUG_NOARG("Compiling c-code");
+        system("gcc out.c");
+        LOG_DEBUG_NOARG("Executing c-code");
+        system("./a.out");
     }
 
 done:
     for (CompilerError *err = e.head; err != NULL; err = err->next) {
-        printf("%s\n", err->msg.str);
+        LOG_ERROR("%s", err->msg.str);
     }
     // We could be "good citizens" and release the memory here, but the OS is going to do it
     // anyways on the process terminating, so it doesn't really make a difference.
@@ -140,6 +148,7 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "Error: Log level must be between 0 and 2.\n");
                 return EXIT_FAILURE;
             }
+            options.log_level = log_level;
         } break;
         case 'p':
             options.parse_only = true;
@@ -155,20 +164,23 @@ int main(int argc, char *argv[])
             return EXIT_FAILURE;
         }
     }
-    
+
+    /* Set up global logger */
+    log_init_global((LogLevel)options.log_level);
+
     /* Check if there are any remaining input arguments (used as the input file) */
     char *input_file;
     if (optind < argc) {
         input_file = argv[optind];
     } else {
-        fprintf(stderr, "Error: No input file specified.\n");
+        LOG_FATAL_NOARG("No input file specified");
         return EXIT_FAILURE;
     }
 
     /* Read input file in its entirety */
     struct stat st;
     if (stat(input_file, &st) != 0) {
-        fprintf(stderr, "Error: Could not find file '%s'.\n", input_file);
+        LOG_FATAL("Could not find file '%s'", input_file);
         return EXIT_FAILURE;
     }
     size_t input_size = st.st_size;
@@ -176,13 +188,13 @@ int main(int argc, char *argv[])
     input[input_size] = 0;
     FILE *fp = fopen(input_file, "r");
     if (fp == NULL) {
-        fprintf(stderr, "Error: Could not open file '%s'.\n", input_file);
+        LOG_FATAL("Could not open file '%s'", input_file);
         free(input);
         fclose(fp);
         return EXIT_FAILURE;
     }
     if (fread(input, sizeof(char), st.st_size, fp) != input_size) {
-        fprintf(stderr, "Error: Could not read file '%s'.\n", input_file);
+        LOG_FATAL("Could not read file '%s'", input_file);
         free(input);
         fclose(fp);
         return EXIT_FAILURE;
@@ -190,6 +202,7 @@ int main(int argc, char *argv[])
     fclose(fp);
 
     u32 n_errors = compile(input);
+    free(input);
     if (n_errors == 0) {
         return 0;
     }

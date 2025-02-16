@@ -23,6 +23,8 @@
 #include "lex.h"
 #include "type.h"
 
+// TODO: This file should call functions from log.c
+
 #define ERROR_HANDLER_MAX_ERRORS 64 // Just give up after this
 
 typedef struct compiler_error_t CompilerError;
