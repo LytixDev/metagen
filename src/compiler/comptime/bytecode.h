@@ -24,7 +24,7 @@
 #include "compiler/type.h"
 
 typedef s64 BytecodeWord;
-typedef u16 BytecodeImm; // Value immeditely preceeding certain instructions
+typedef s16 BytecodeImm; // Value immeditely preceeding certain instructions
 
 /*
  * Function prologue:
@@ -46,10 +46,10 @@ typedef enum {
     OP_SUBW,
     OP_MULW,
     OP_DIVW,
-    OP_LSHIFT,
-    OP_RSHIFT,
+    OP_LSHIFTW,
+    OP_RSHIFTW,
     OP_GE, // pop a and pop b. Push 1 if a >= b
-    OP_LE, // pop a and pop b. Push 1 if a =< b
+    OP_LE, // pop a and pop b. Push 1 if a <= b
     OP_NOT,
 
     /* Branching */
@@ -58,14 +58,19 @@ typedef enum {
     OP_BNZ, // pop and add imm to ip if popped value is not zero
 
     /* stack operations */
-    OP_CONSW, // push next word
-    OP_PUSHN, // make space for n words words
-    OP_POPN, // remove space for n words on
-    OP_LOADL, // push value at next imm + bp
-    OP_STOREL, // pop and store value at next imm + bp
+    OP_CONSTANTW, // push next word
+    OP_PUSHNW, // make space for n words
+    OP_POPNW, // remove space for n words
+    OP_LDBPW, // bp-relative + immediate stack load
+    OP_STBPW, // bp-relative + immediate stack store
+    OP_LDAW, // stack load @ next word
+    OP_STAW, // stack store @ next word
 
     OP_PRINT,
-    OP_RETURN,
+    OP_CALL, // TODO
+    OP_FUNCPRO, // push bp, set bp = sp
+    OP_RET, // TODO
+    OP_EXIT, // Halt the execution
 
     OP_TYPE_LEN,
 } OpCode;
@@ -78,13 +83,25 @@ typedef struct {
     // TODO: Pool allocated or something
     u8 code[4096];
     u32 code_offset;
+
+    /* Debug */
+    s64 source_lines[4094];
 } Bytecode;
 
-typedef struct locals_t Locals;
-struct locals_t {
-    HashMap map; // Key: Symbol identfier, Value: code_offset + 1 (so we can use 0x0 as NULL).
-    Locals *parent;
+/*
+ * Each function gets their own.
+ * Each scope gets their own.
+ */
+typedef struct stack_vars_t StackVars;
+struct stack_vars_t {
+    HashMap map; // Key: Symbol name, Value: offset from bp
+    StackVars *parent;
 };
+/*
+ * For storing in the map, we ensure each value is larger than 0.
+ * Otherwise, a bp_rel_offset of 0 would be treated as the NULL pointer.
+ */
+#define STACK_VAR_MAP_ADD (S16_MAX + 2)
 
 typedef enum {
     BCF_STORE_IDENT = 1,
@@ -92,15 +109,27 @@ typedef enum {
 } BytecodeCompilerFlags;
 
 typedef struct {
+    u32 offset;
+    Str8 func_name;
+} PatchCall;
+
+typedef struct {
     SymbolTable symt_root;
     Bytecode bytecode;
-    Locals *locals; /* NOTE: Root Locals object also stores global functions and variables */
+
+    StackVars *stack_vars;
+    s64 bp_stack_offset;
+
+    HashMap globals; // Key: Symbol name, Value: Absolute position in the stack
+    HashMap functions; // Key: Symbol name, Value: Absolute position of first instruction in code
+    PatchCall patches[100];
+    u32 calls_to_patch;
     BytecodeCompilerFlags flags;
 } BytecodeCompiler;
 
 
 Bytecode ast_to_bytecode(SymbolTable symt_root, AstRoot *root);
-void disassemble(Bytecode b);
+void disassemble(Bytecode b, Str8 source);
 
 Bytecode fib_test(void);
 

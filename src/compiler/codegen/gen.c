@@ -159,6 +159,10 @@ static void gen_global(Compiler *compiler, Symbol *sym)
 
 static void gen_expr(Compiler *compiler, AstExpr *head)
 {
+    if (head->kind == EXPR_BINARY) {
+        fprintf(f, "(");
+    }
+
     switch (head->kind) {
     case EXPR_UNARY: {
         AstUnary *expr = AS_UNARY(head);
@@ -185,7 +189,6 @@ static void gen_expr(Compiler *compiler, AstExpr *head)
             gen_expr(compiler, expr->right);
             break;
         }
-        fprintf(f, "(");
         if (expr->left->type->kind == TYPE_POINTER && expr->op == TOKEN_DOT) {
             fprintf(f, "*");
         }
@@ -195,11 +198,9 @@ static void gen_expr(Compiler *compiler, AstExpr *head)
             fprintf(f, "[");
             gen_expr(compiler, expr->right);
             fprintf(f, "]");
-            fprintf(f, ")");
             break;
         }
         gen_expr(compiler, expr->left);
-        fprintf(f, ")");
         switch (expr->op) {
         case TOKEN_PLUS:
             fprintf(f, " + ");
@@ -223,16 +224,16 @@ static void gen_expr(Compiler *compiler, AstExpr *head)
             fprintf(f, ".");
             break;
         case TOKEN_EQ:
-            fprintf(f, "==");
+            fprintf(f, " == ");
             break;
         case TOKEN_NEQ:
-            fprintf(f, "!=");
+            fprintf(f, " != ");
             break;
         case TOKEN_LESS:
-            fprintf(f, "<");
+            fprintf(f, " < ");
             break;
         case TOKEN_GREATER:
-            fprintf(f, ">");
+            fprintf(f, " > ");
             break;
         default:
             ASSERT_NOT_REACHED;
@@ -277,12 +278,18 @@ static void gen_expr(Compiler *compiler, AstExpr *head)
     default:
         ASSERT_NOT_REACHED;
     }
+
+    if (head->kind == EXPR_BINARY) {
+        fprintf(f, ")");
+    }
 }
 
 
 static void gen_stmt(Compiler *compiler, AstStmt *head, u32 indent)
 {
-    write_newline_and_indent(indent);
+    if (indent != 0) {
+        write_newline_and_indent(indent);
+    }
     switch (head->kind) {
     case STMT_WHILE: {
         AstWhile *stmt = AS_WHILE(head);
@@ -306,10 +313,10 @@ static void gen_stmt(Compiler *compiler, AstStmt *head, u32 indent)
         fprintf(f, "}");
     } break;
     case STMT_BREAK:
-        fprintf(f, "break");
+        fprintf(f, "break;");
         break;
     case STMT_CONTINUE:
-        fprintf(f, "continue");
+        fprintf(f, "continue;");
         break;
     case STMT_RETURN: {
         AstSingle *stmt = AS_SINGLE(head);
@@ -399,13 +406,19 @@ static void gen_func(Compiler *compiler, Symbol *sym)
         fprintf(f, "void");
     }
 
-    fprintf(f, ")\n{");
+    fprintf(f, ")\n");
 
     /* Generate function body */
     AstFunc *func_node = (AstFunc *)sym->node;
-    gen_stmt(compiler, func_node->body, 2);
+    if (func_node->body->kind != STMT_BLOCK) {
+        fprintf(f, "{");
+        gen_stmt(compiler, func_node->body, 2);
+        fprintf(f, "\n}");
+    } else {
+        gen_stmt(compiler, func_node->body, 0);
+    }
 
-    fprintf(f, "\n}");
+    fprintf(f, "\n");
 }
 
 

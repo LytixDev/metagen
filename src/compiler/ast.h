@@ -107,6 +107,7 @@ typedef struct expr_t {
 
 typedef struct stmt_t {
     AstStmtKind kind;
+    s64 line; // -1 means no line info
 } AstStmt;
 
 typedef struct {
@@ -151,12 +152,14 @@ typedef struct {
 /* Statements */
 typedef struct {
     AstStmtKind kind;
+    s64 line;
     AstExpr *condition;
     AstStmt *body;
 } AstWhile;
 
 typedef struct {
     AstStmtKind kind;
+    s64 line;
     AstExpr *condition;
     AstStmt *then;
     AstStmt *else_;
@@ -164,11 +167,13 @@ typedef struct {
 
 typedef struct {
     AstStmtKind kind;
+    s64 line;
     AstNode *node; // @NULLABLE
 } AstSingle;
 
 typedef struct {
     AstStmtKind kind;
+    s64 line;
     TypedIdentList declarations;
     AstList *stmts;
     // NOTE: Is this where this should be?
@@ -177,6 +182,7 @@ typedef struct {
 
 typedef struct {
     AstStmtKind kind;
+    s64 line;
     AstExpr *left; // Identifier literal, array indexing, dereference or struct member access
     AstExpr *right;
 } AstAssignment;
@@ -191,6 +197,7 @@ struct ast_list_node {
 
 struct ast_list {
     AstNodeKind kind;
+    s64 line;
     AstListNode *head;
     AstListNode *tail;
 };
@@ -205,7 +212,7 @@ typedef struct {
     AstNodeKind kind;
     Str8 name;
     TypedIdentList parameters;
-    AstTypeInfo return_type;
+    AstTypeInfo ast_return_type; // Not the actual return type, only the ast info needed to infer it
     AstStmt *body; // @NULLABLE. If NULL then the function is a compiler
 } AstFunc;
 
@@ -223,8 +230,9 @@ typedef struct {
 
 typedef struct {
     AstNodeKind kind;
+    AstFunc *main_function; // @NULLABLE
     AstList vars; // AstTypedVarList wrapped inside
-    AstList funcs; // AstFunc
+    AstList funcs; // AstFunc, includes the main function, if it exists
     AstList structs; // AstStruct
     AstList enums; // AstEnum
     AstList calls; // AstCall - Compile time calls
@@ -262,14 +270,12 @@ AstUnary *make_unary(Arena *a, AstExpr *expr, TokenKind op);
 AstBinary *make_binary(Arena *a, AstExpr *left, TokenKind op, AstExpr *right);
 AstLiteral *make_literal(Arena *a, Token token);
 AstCall *make_call(Arena *a, bool is_comptime_call, Str8View identifier, AstList *args);
-
 /* Statements */
-AstWhile *make_while(Arena *a, AstExpr *condition, AstStmt *body);
-AstIf *make_if(Arena *a, AstExpr *condition, AstStmt *then, AstStmt *else_);
-AstSingle *make_single(Arena *a, AstStmtKind single_type, AstNode *node);
-AstBlock *make_block(Arena *a, TypedIdentList declarations, AstList *statements);
-AstAssignment *make_assignment(Arena *a, AstExpr *left, AstExpr *right);
-
+AstWhile *make_while(Arena *a, AstExpr *condition, AstStmt *body, s64 line);
+AstIf *make_if(Arena *a, AstExpr *condition, AstStmt *then, AstStmt *else_, s64 line);
+AstSingle *make_single(Arena *a, AstStmtKind single_type, AstNode *node, s64 line);
+AstBlock *make_block(Arena *a, TypedIdentList declarations, AstList *statements, s64 line);
+AstAssignment *make_assignment(Arena *a, AstExpr *left, AstExpr *right, s64 line);
 /* Declarations and other nodes*/
 AstFunc *make_func(Arena *a, Str8 name, TypedIdentList params, AstStmt *body,
                    AstTypeInfo return_type);

@@ -68,3 +68,26 @@ struct User {
 - [ ] Compile-time execution
 - [ ] AST modification at compile-time
 
+### Language Features
+| Feature | Frontend | C backend | Bytecode backend |
+|----------|----------|----------|----------|
+| If else | ✅ | ✅ | ✅  |
+| Switch | ❌ | ❌ | ❌ |
+| While loops | ✅ | ✅ | ✅ |
+| For loops | ❌ | ❌ | ❌ |
+| Foreach loops | ❌ | ❌ | ❌ |
+| Structs | ✅ | ⏳ | ❌ |
+| Enums | ✅ | ⏳ | ❌ |
+| Strings | ✅ | ❌ | ❌ |
+| Arrays | ✅ | ✅ | ❌ |
+| Slices | ❌ | ❌ | ❌ |
+| Functions | ✅ | ✅ | ✅   |
+| Ints & Floats | ⏳ | ❌ | ❌ |
+| Booleans | ❌ | ❌ | ❌ |
+| Arithmetic | ✅  | ✅  | ✅  |
+
+misc:
+- more comparison operators (>, >=)
+- solution for integral literal deduction
+- modulo operators
+- first-class functions

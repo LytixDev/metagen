@@ -30,14 +30,17 @@ typedef struct {
     Bytecode b;
     u8 *ip;
 
-    BytecodeWord stack[STACK_MAX];
+    u8 stack[STACK_MAX * 8]; // Byte-addressable stack
     u8 *sp;
-    u8 bp;
+    u8 *ss; // stack start
+    BytecodeWord bp; // Base pointer as an index / offset
 
     VMFlags flags;
+
+    size_t instructions_executed;
 } MetagenVM;
 
 
-u32 run(Bytecode b);
+u32 run(Bytecode bytecode, bool debug);
 
 #endif /* VM_H */

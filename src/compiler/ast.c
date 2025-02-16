@@ -75,46 +75,51 @@ AstCall *make_call(Arena *a, bool is_comptime, Str8View identifier, AstList *arg
 }
 
 /* Statements */
-AstWhile *make_while(Arena *a, AstExpr *condition, AstStmt *body)
+AstWhile *make_while(Arena *a, AstExpr *condition, AstStmt *body, s64 line)
 {
     AstWhile *stmt = m_arena_alloc(a, sizeof(AstWhile));
     stmt->kind = STMT_WHILE;
+    stmt->line = line;
     stmt->condition = condition;
     stmt->body = body;
     return stmt;
 }
 
-AstIf *make_if(Arena *a, AstExpr *condition, AstStmt *then, AstStmt *else_)
+AstIf *make_if(Arena *a, AstExpr *condition, AstStmt *then, AstStmt *else_, s64 line)
 {
     AstIf *stmt = m_arena_alloc(a, sizeof(AstIf));
     stmt->kind = STMT_IF;
+    stmt->line = line;
     stmt->condition = condition;
     stmt->then = then;
     stmt->else_ = else_;
     return stmt;
 }
 
-AstSingle *make_single(Arena *a, AstStmtKind single_type, AstNode *node)
+AstSingle *make_single(Arena *a, AstStmtKind single_type, AstNode *node, s64 line)
 {
     AstSingle *stmt = m_arena_alloc(a, sizeof(AstSingle));
     stmt->kind = single_type;
+    stmt->line = line;
     stmt->node = node;
     return stmt;
 }
 
-AstBlock *make_block(Arena *a, TypedIdentList declarations, AstList *stmts)
+AstBlock *make_block(Arena *a, TypedIdentList declarations, AstList *stmts, s64 line)
 {
     AstBlock *stmt = m_arena_alloc(a, sizeof(AstBlock));
     stmt->kind = STMT_BLOCK;
+    stmt->line = line;
     stmt->declarations = declarations;
     stmt->stmts = stmts;
     return stmt;
 }
 
-AstAssignment *make_assignment(Arena *a, AstExpr *left, AstExpr *right)
+AstAssignment *make_assignment(Arena *a, AstExpr *left, AstExpr *right, s64 line)
 {
     AstAssignment *stmt = m_arena_alloc(a, sizeof(AstAssignment));
     stmt->kind = STMT_ASSIGNMENT;
+    stmt->line = line;
     stmt->left = left;
     stmt->right = right;
     return stmt;
@@ -128,7 +133,7 @@ AstFunc *make_func(Arena *a, Str8View name, TypedIdentList params, AstStmt *body
     func->kind = AST_FUNC;
     func->name = name;
     func->parameters = params;
-    func->return_type = return_type;
+    func->ast_return_type = return_type;
     func->body = body;
     return func;
 }
@@ -192,6 +197,7 @@ AstRoot *make_root(Arena *a, AstList vars, AstList funcs, AstList structs, AstLi
 {
     AstRoot *root = m_arena_alloc(a, sizeof(AstRoot));
     root->kind = AST_ROOT;
+    root->main_function = NULL;
     root->vars = vars;
     root->funcs = funcs;
     root->structs = structs;
@@ -276,6 +282,7 @@ void ast_print_stmt(AstStmt *head, u32 indent)
         putchar('\n');
     }
     print_indent(indent);
+    //printf("%s@%zu", node_kind_str_map[head->kind], head->line);
     printf("%s", node_kind_str_map[head->kind]);
     switch (head->kind) {
     case STMT_WHILE: {

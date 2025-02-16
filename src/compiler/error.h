@@ -43,7 +43,7 @@ typedef struct error_handler_t {
     CompilerError *tail;
 } ErrorHandler;
 
-void error_handler_init(ErrorHandler *e, char *input, char *file_name);
+void error_handler_init(ErrorHandler *e, u8 *input, char *file_name);
 void error_handler_release(ErrorHandler *e);
 void error_handler_reset(ErrorHandler *e);
 

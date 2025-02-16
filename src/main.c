@@ -40,6 +40,7 @@ typedef struct {
     bool parse_only; /* Stops after parsing and prints the syntax tree */
     bool bytecode_backend; /* Emits bytecode instead of the default C backend */
     bool run_bytecode; /* Treat the input as bytecode and run it */
+    bool debug_bytecode; /* Bytecode backend goes into debug mode */
 } MetagenOptions;
 
 MetagenOptions options = { 0 };
@@ -55,7 +56,7 @@ bool run_compiler_pass(Compiler *c, AstRoot *root, CompilerPass pass, char *name
     return c->e->n_errors > 0;
 }
 
-u32 compile(char *file_name, char *input)
+u32 compile(char *file_name, Str8 source)
 {
     Arena lex_arena;
     Arena persist_arena; /* Data which should persist throughout the lifetime of the compiler */
@@ -65,14 +66,14 @@ u32 compile(char *file_name, char *input)
     m_arena_init_dynamic(&pass_arena, 1, 512);
 
     ErrorHandler e;
-    error_handler_init(&e, input, file_name);
+    error_handler_init(&e, source.str, file_name);
 
     Compiler compiler = { .persist_arena = &persist_arena, .pass_arena = &pass_arena, .e = &e };
     arraylist_init(&compiler.struct_types, sizeof(TypeInfoStruct *));
     arraylist_init(&compiler.all_types, sizeof(TypeInfo *));
 
     /* Frontend */
-    AstRoot *ast_root = parse(&persist_arena, &lex_arena, &e, input);
+    AstRoot *ast_root = parse(&persist_arena, &lex_arena, &e, (char *)source.str);
     for (CompilerError *err = e.head; err != NULL; err = err->next) {
         printf("%s\n", err->msg.str);
     }
@@ -101,8 +102,11 @@ u32 compile(char *file_name, char *input)
     if (options.bytecode_backend && options.run_bytecode) {
         LOG_DEBUG_NOARG("Generating bytecode");
         Bytecode bytecode = ast_to_bytecode(compiler.symt_root, ast_root);
-        disassemble(bytecode);
-        run(bytecode);
+        if (options.debug_bytecode) {
+            disassemble(bytecode, source);
+        }
+        //run(bytecode, options.debug_bytecode);
+        run(bytecode, false);
     } else {
         LOG_DEBUG_NOARG("Generating c-code");
         transpile_to_c(&compiler);
@@ -135,9 +139,10 @@ int main(int argc, char *argv[])
      * -b           Emits bytecode instead of the default C backend.
      * -r           Treat the input as bytecode and run it. If used with -b then it runs the
      *              bytecode directly.
+     * -d           Debug bytecode.
      */
     int opt;
-    while ((opt = getopt(argc, argv, "l:pbr")) != -1) {
+    while ((opt = getopt(argc, argv, "l:pbrd")) != -1) {
         switch (opt) {
         case 'l': {
             int log_level = atoi(optarg);
@@ -155,6 +160,9 @@ int main(int argc, char *argv[])
             break;
         case 'r':
             options.run_bytecode = true;
+            break;
+        case 'd':
+            options.debug_bytecode = true;
             break;
         case '?':
             fprintf(stderr, "Error: Bad usage.\n");
@@ -198,7 +206,7 @@ int main(int argc, char *argv[])
     }
     fclose(fp);
 
-    u32 n_errors = compile(input_file, input);
+    u32 n_errors = compile(input_file, (Str8){ .str = (u8 *)input, .len = input_size });
     free(input);
     if (n_errors == 0) {
         return 0;
