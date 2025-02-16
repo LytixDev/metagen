@@ -1,8 +1,0 @@
-var array: s32[64]
-
-func main(): s32 begin
-    array[0] := 1
-    array[1] := 2
-    array[2] := 3
-    print array[0] + array[1] + array[1+1]
-end
