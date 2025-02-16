@@ -104,7 +104,7 @@ u32 compile(char *file_name, char *input)
     if (options.bytecode_backend && options.run_bytecode) {
         LOG_DEBUG_NOARG("Generating bytecode");
         Bytecode bytecode = ast_to_bytecode(compiler.symt_root, ast_root);
-        // disassemble(bytecode);
+        disassemble(bytecode);
         run(bytecode);
     } else {
         LOG_DEBUG_NOARG("Generating c-code");
