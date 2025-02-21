@@ -67,6 +67,7 @@ void error_msg_str8(ErrorHandler *e, Str8 msg)
 
 void error_lex(ErrorHandler *e, char *msg, Point start, Point end)
 {
+    (void)start;
     Str8Builder sb = make_str_builder(&e->arena);
     str_builder_sprintf(&sb, "[%s @ line %d] ", 2, e->file_name, end.l);
     str_builder_append_cstr(&sb, msg, strlen(msg));
@@ -86,6 +87,7 @@ void error_parse(ErrorHandler *e, char *msg, Token guilty)
 
 void error_node(ErrorHandler *e, char *msg, AstNode *guilty)
 {
+    (void)guilty;
     Str8Builder sb = make_str_builder(&e->arena);
     str_builder_sprintf(&sb, "[%s @ line %d] ", 2, e->file_name, -1);
     str_builder_append_cstr(&sb, msg, strlen(msg));
@@ -108,5 +110,7 @@ void error_sym(ErrorHandler *e, char *msg, Str8 name)
 
 void error_typecheck_binary(ErrorHandler *e, char *msg, AstNode *guilty, TypeInfo *l, TypeInfo *r)
 {
+    (void)l;
+    (void)r;
     error_node(e, msg, guilty);
 }

@@ -229,8 +229,8 @@ static AstExpr *parse_primary(Parser *parser)
         if (next.kind != TOKEN_IDENTIFIER) {
             error_parse(parser->lexer.e, "RHS of unary * or & must start with an identifier", next);
         }
-        /* Intentional fallthrough */
     }
+    /* fallthrough */
     case TOKEN_MINUS: {
         AstExpr *expr = parse_expr(parser, 0);
         return (AstExpr *)make_unary(parser->arena, expr, token.kind);
