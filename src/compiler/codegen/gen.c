@@ -110,7 +110,7 @@ static u8 type_info_to_printf_format(TypeInfo *t)
     }
 }
 
-static void gen_enum(Compiler *compiler, Symbol *sym)
+static void gen_enum(Symbol *sym)
 {
     fprintf(f, "enum %s {\n", sym->name.str);
 
@@ -127,7 +127,7 @@ static void gen_enum(Compiler *compiler, Symbol *sym)
     fprintf(f, "};\n");
 }
 
-static void gen_struct(Compiler *compiler, Symbol *sym)
+static void gen_struct(Symbol *sym)
 {
     fprintf(f, "struct %s_t {\n", sym->name.str);
 
@@ -432,7 +432,7 @@ void transpile_to_c(Compiler *compiler)
         Symbol *sym = symt_root->symbols[i];
         if (sym->kind == SYMBOL_TYPE) {
             if (sym->type_info->kind == TYPE_ENUM) {
-                gen_enum(compiler, sym);
+                gen_enum(sym);
             }
         }
     }
@@ -455,7 +455,7 @@ void transpile_to_c(Compiler *compiler)
     for (u32 i = 0; i < compiler->struct_types.size; i++) {
         TypeInfoStruct *type_info = *(TypeInfoStruct **)arraylist_get(&compiler->struct_types, i);
         Symbol *sym = symt_find_sym(&compiler->symt_root, type_info->info.generated_by);
-        gen_struct(compiler, sym);
+        gen_struct(sym);
     }
 
     fprintf(f, "\n");

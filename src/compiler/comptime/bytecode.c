@@ -116,7 +116,7 @@ static Locals *make_locals(Locals *parent)
 static BytecodeImm find_ident_offset(BytecodeCompiler *compiler, Str8 ident)
 {
     for (Locals *locals = compiler->locals; locals; locals = locals->parent) {
-        void *offset = hashmap_get(&locals->map, ident.str, ident.len);
+        BytecodeImm *offset = hashmap_get(&locals->map, ident.str, ident.len);
         if (offset != NULL) {
             return (BytecodeImm)offset - 1;
         }
@@ -307,8 +307,8 @@ void ast_func_to_bytecode(BytecodeCompiler *compiler, AstFunc *func)
     Symbol *sym = symt_find_sym(&compiler->symt_root, func->name);
     assert(sym != NULL && sym->kind == SYMBOL_FUNC);
 
-    SymbolTable params = sym->symt_local;
-    u32 params_space = 0;
+    // SymbolTable params = sym->symt_local;
+    // u32 params_space = 0;
     // for (u32 i = 0; i < params.sym_len; i++) {
     //     Symbol *param = params.symbols[i];
     //     hashmap_put(&compiler->locals->map, param->name.str, param->name.len,
