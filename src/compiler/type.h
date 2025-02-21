@@ -136,7 +136,7 @@ struct symbol_t {
 
 
 u32 type_info_bit_size(TypeInfo *type_info);
-Symbol *symt_find_sym(SymbolTable *symt, Str8 key);
+Symbol *get_sym_by_name(SymbolTable *symt, Str8 key);
 
 void typegen(Compiler *c, AstRoot *root);
 void infer(Compiler *c, AstRoot *root);

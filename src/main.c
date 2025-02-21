@@ -52,9 +52,6 @@ bool run_compiler_pass(Compiler *c, AstRoot *root, CompilerPass pass, char *name
     LOG_DEBUG("Running compiler pass '%s'", name);
     m_arena_clear(c->pass_arena);
     pass(c, root);
-    for (CompilerError *err = c->e->head; err != NULL; err = err->next) {
-        printf("%s\n", err->msg.str);
-    }
     return c->e->n_errors > 0;
 }
 

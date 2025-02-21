@@ -183,7 +183,7 @@ static Symbol *symt_new_sym(Compiler *c, SymbolTable *symt, SymbolKind sym_kind,
     return sym;
 }
 
-Symbol *symt_find_sym(SymbolTable *symt, Str8 key)
+Symbol *get_sym_by_name(SymbolTable *symt, Str8 key)
 {
     Symbol *sym = NULL;
     SymbolTable *symt_current = symt;
@@ -199,7 +199,7 @@ static TypeInfo *ast_type_resolve(Compiler *c, AstTypeInfo ati, bool err_if_not_
     // NOTE: This function uses the root symbol table. Okay as of now since we don't allow
     //       declarations that generate types that aren't global.
     Str8 sym_name = ati.name;
-    Symbol *sym = symt_find_sym(&c->symt_root, sym_name);
+    Symbol *sym = get_sym_by_name(&c->symt_root, sym_name);
     if (sym == NULL) {
         if (err_if_not_resolved) {
             error_sym(c->e, "Type not found", sym_name);
@@ -320,7 +320,7 @@ static void bind_expr(Compiler *c, SymbolTable *symt_local, AstExpr *head)
         if (lit->lit_type != LIT_IDENT) {
             break;
         }
-        Symbol *sym = symt_find_sym(symt_local, lit->literal);
+        Symbol *sym = get_sym_by_name(symt_local, lit->literal);
         lit->sym = sym;
         if (sym == NULL) {
             error_sym(c->e, "Symbol never declared", lit->literal);
@@ -398,7 +398,7 @@ static void bind_stmt(Compiler *c, SymbolTable *symt_local, AstStmt *head)
 
 static void bind_function(Compiler *c, AstFunc *func)
 {
-    Symbol *func_sym = symt_find_sym(&c->symt_root, func->name);
+    Symbol *func_sym = get_sym_by_name(&c->symt_root, func->name);
     assert(func_sym != NULL && "Internal Error: Could not find symbol for function !?");
 
     /* Create symbols for function parameters */
@@ -460,7 +460,7 @@ static TypeInfo *typecheck_expr(Compiler *c, SymbolTable *symt_local, AstExpr *h
              * if bind_expr succeeds, it has been bound to the correct type, and we shall return
              * this type.
              */
-            Symbol *type_sym = symt_find_sym(symt_local, left->generated_by);
+            Symbol *type_sym = get_sym_by_name(symt_local, left->generated_by);
             bind_expr(c, &type_sym->symt_local, expr->right);
             head->type = typecheck_expr(c, &type_sym->symt_local, expr->right);
             break;
@@ -487,13 +487,17 @@ static TypeInfo *typecheck_expr(Compiler *c, SymbolTable *symt_local, AstExpr *h
             head->type = lit->sym->type_info;
         } else {
             // TODO: temporary assumption that every constant literal that is not an ident is a s32
-            Symbol *sym = symt_find_sym(symt_local, (Str8){ .len = 3, .str = (u8 *)"s32" });
+            Symbol *sym = get_sym_by_name(symt_local, (Str8){ .len = 3, .str = (u8 *)"s32" });
             head->type = sym->type_info;
         }
     } break;
     case EXPR_CALL: {
         AstCall *call = AS_CALL(head);
-        Symbol *sym = symt_find_sym(symt_local, call->identifier);
+        Symbol *sym = get_sym_by_name(symt_local, call->identifier);
+        if (sym == NULL) {
+            error_sym(c->e, "Function not found", call->identifier);
+            break;
+        }
         TypeInfoFunc *callee = (TypeInfoFunc *)sym->type_info;
         if (call->args == NULL && callee->n_params == 0) {
             head->type = callee->return_type;
@@ -725,7 +729,7 @@ static void resolve_global_types(Compiler *c)
             continue;
         }
         /* Generate symbols for struct members */
-        Symbol *struct_sym = symt_find_sym(&c->symt_root, t_struct->info.generated_by);
+        Symbol *struct_sym = get_sym_by_name(&c->symt_root, t_struct->info.generated_by);
         assert(struct_sym && struct_sym->type_info && struct_sym->type_info->kind == TYPE_STRUCT);
         for (u32 j = 0; j < t_struct->members_len; j++) {
             TypeInfoStructMember *m = t_struct->members[j];
@@ -848,7 +852,7 @@ void typecheck(Compiler *c, AstRoot *root)
     /* Typecheck each function */
     for (AstListNode *node = root->funcs.head; node != NULL; node = node->next) {
         AstFunc *func = AS_FUNC(node->this);
-        Symbol *func_sym = symt_find_sym(&c->symt_root, func->name);
+        Symbol *func_sym = get_sym_by_name(&c->symt_root, func->name);
         assert(func_sym != NULL && "Could not find symbol for function in bind_and_check!?!?");
         if (func->body != NULL) {
             typecheck_stmt(c, &func_sym->symt_local, (TypeInfoFunc *)func_sym->type_info,

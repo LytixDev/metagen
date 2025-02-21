@@ -356,7 +356,7 @@ static void gen_stmt(Compiler *compiler, AstStmt *head, u32 indent)
         /* Declarations */
         for (u32 i = 0; i < stmt->declarations.len; i++) {
             TypedIdent decl = stmt->declarations.vars[i];
-            Symbol *sym = symt_find_sym(stmt->symt_local, decl.name);
+            Symbol *sym = get_sym_by_name(stmt->symt_local, decl.name);
             Str8 type_name = type_info_and_identifier(compiler, sym->type_info, &sym->name);
             fprintf(f, "%s;", type_name.str);
         }
@@ -454,7 +454,7 @@ void transpile_to_c(Compiler *compiler)
     /* Generate structs */
     for (u32 i = 0; i < compiler->struct_types.size; i++) {
         TypeInfoStruct *type_info = *(TypeInfoStruct **)arraylist_get(&compiler->struct_types, i);
-        Symbol *sym = symt_find_sym(&compiler->symt_root, type_info->info.generated_by);
+        Symbol *sym = get_sym_by_name(&compiler->symt_root, type_info->info.generated_by);
         gen_struct(sym);
     }
 

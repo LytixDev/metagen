@@ -304,7 +304,7 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *compiler, AstStmt *head)
 void ast_func_to_bytecode(BytecodeCompiler *compiler, AstFunc *func)
 {
     assert(func->body != NULL);
-    Symbol *sym = symt_find_sym(&compiler->symt_root, func->name);
+    Symbol *sym = get_sym_by_name(&compiler->symt_root, func->name);
     assert(sym != NULL && sym->kind == SYMBOL_FUNC);
 
     // SymbolTable params = sym->symt_local;
