@@ -49,7 +49,7 @@ typedef enum {
     OP_LSHIFT,
     OP_RSHIFT,
     OP_GE, // pop a and pop b. Push 1 if a >= b
-    OP_LE, // pop a and pop b. Push 1 if a =< b
+    OP_LE, // pop a and pop b. Push 1 if a <= b
     OP_NOT,
 
     /* Branching */
@@ -60,9 +60,9 @@ typedef enum {
     /* stack operations */
     OP_CONSW, // push next word
     OP_PUSHN, // make space for n words words
-    OP_POPN, // remove space for n words on
-    OP_LOADL, // push value at next imm + bp
-    OP_STOREL, // pop and store value at next imm + bp
+    OP_POPN, // remove space for n words
+    OP_LOADI, // push value at imm + bp
+    OP_STOREI, // pop and store value at imm + bp
 
     OP_PRINT,
     OP_RETURN,
@@ -78,6 +78,9 @@ typedef struct {
     // TODO: Pool allocated or something
     u8 code[4096];
     u32 code_offset;
+
+    /* Debug */
+    HashMap blame; // Key: index of an instruction, value: line of source code
 } Bytecode;
 
 typedef struct locals_t Locals;

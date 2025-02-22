@@ -24,7 +24,7 @@
 char *op_code_str_map[OP_TYPE_LEN] = {
     "OP_ADDW", "OP_SUBW",  "OP_MULW",   "OP_DIVW",  "OP_LSHIFT", "OP_RSHIFT", "OP_GE",
     "OP_LE",   "OP_NOT",   "OP_JMP",    "OP_BIZ",   "OP_BNZ",    "OP_CONSW",  "OP_PUSHN",
-    "OP_POPN", "OP_LOADL", "OP_STOREL", "OP_PRINT", "OP_RETURN",
+    "OP_POPN", "OP_LOADI", "OP_STOREI", "OP_PRINT", "OP_RETURN",
 };
 
 
@@ -41,11 +41,16 @@ static void disassemble_instruction(Bytecode *b)
         printf(" args %d", n_args);
     }; break;
     case OP_BIZ:
-    case OP_BNZ:
+    case OP_BNZ: {
+        u32 current_offset = b->code_offset;
+        BytecodeImm value = *(BytecodeImm *)(b->code + b->code_offset);
+        b->code_offset += sizeof(BytecodeImm);
+        printf(" %d", value + current_offset + 1);
+    }; break;
     case OP_POPN:
     case OP_PUSHN:
-    case OP_LOADL:
-    case OP_STOREL: {
+    case OP_LOADI:
+    case OP_STOREI: {
         BytecodeImm value = *(BytecodeImm *)(b->code + b->code_offset);
         b->code_offset += sizeof(BytecodeImm);
         printf(" %d", value);
@@ -186,7 +191,7 @@ static void ast_expr_to_bytecode(BytecodeCompiler *compiler, AstExpr *head)
             writeu8(&compiler->bytecode, OP_CONSW);
             writew(&compiler->bytecode, literal);
         } else if (expr->lit_type == LIT_IDENT) {
-            writeu8(&compiler->bytecode, compiler->flags == BCF_STORE_IDENT ? OP_STOREL : OP_LOADL);
+            writeu8(&compiler->bytecode, compiler->flags == BCF_STORE_IDENT ? OP_STOREI : OP_LOADI);
             writei(&compiler->bytecode, find_ident_offset(compiler, expr->sym->name));
         } else {
             printf("Ast literal expr kind not handled\n");

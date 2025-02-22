@@ -20,21 +20,21 @@
 #include <stdio.h>
 
 
-static BytecodeWord readw(MetagenVM *vm)
+static BytecodeWord nextw(MetagenVM *vm)
 {
     BytecodeWord value = *(BytecodeWord *)vm->ip;
     vm->ip += sizeof(BytecodeWord);
     return value;
 }
 
-static BytecodeImm readi(MetagenVM *vm)
+static BytecodeImm nexti(MetagenVM *vm)
 {
     BytecodeImm value = *(BytecodeImm *)vm->ip;
     vm->ip += sizeof(BytecodeImm);
     return value;
 }
 
-static u8 read_u8(MetagenVM *vm)
+static u8 next_u8(MetagenVM *vm)
 {
     u8 value = *vm->ip;
     vm->ip++;
@@ -82,18 +82,13 @@ u32 run(Bytecode bytecode)
     vm.b = bytecode;
     vm.ip = bytecode.code;
     vm.sp = (u8 *)vm.stack;
-    vm.bp = 0;
-    vm.flags = 0;
+    // vm.bp = 0;
+    // vm.flags = 0;
 
     while (1) {
         // printf(">%d %s\n", vm.ip - bytecode.code, op_code_str_map[*vm.ip]);
         OpCode instruction;
         switch (instruction = *vm.ip++) {
-        case OP_CONSW: {
-            BytecodeWord value = readw(&vm);
-            pushw(&vm, value);
-        }; break;
-
         /* Arithmetic */
         case OP_ADDW:
             pushw(&vm, popw(&vm) + popw(&vm));
@@ -123,42 +118,52 @@ u32 run(Bytecode bytecode)
             pushw(&vm, !popw(&vm));
             break;
 
+        /* Jumps and branches */
         case OP_JMP:
             vm.ip = bytecode.code + popw(&vm);
             break;
         case OP_BIZ: {
-            BytecodeImm target = readi(&vm);
+            BytecodeImm target = nexti(&vm);
             if (popw(&vm) == 0) {
                 vm.ip += target;
             }
         } break;
         case OP_BNZ: {
-            BytecodeImm target = readi(&vm);
+            BytecodeImm target = nexti(&vm);
             if (popw(&vm) != 0) {
                 vm.ip += target;
             }
         } break;
+        case OP_RETURN: {
+            goto vm_loop_done;
+        }
 
+        /* Stack manipulation */
+        case OP_CONSW: {
+            BytecodeWord value = nextw(&vm);
+            pushw(&vm, value);
+        }; break;
         case OP_PUSHN: {
-            BytecodeImm n_words = readi(&vm);
+            BytecodeImm n_words = nexti(&vm);
             pushn(&vm, n_words);
         } break;
         case OP_POPN: {
-            BytecodeImm n_words = readi(&vm);
+            BytecodeImm n_words = nexti(&vm);
             popn(&vm, n_words);
         } break;
-        case OP_STOREL: {
-            BytecodeImm bp_offset = readi(&vm);
+        case OP_LOADI: {
+            BytecodeImm bp_offset = nexti(&vm);
+            pushw(&vm, loadw(&vm, bp_offset));
+        } break;
+        case OP_STOREI: {
+            BytecodeImm bp_offset = nexti(&vm);
             BytecodeWord value = popw(&vm);
             storew(&vm, bp_offset, value);
         } break;
-        case OP_LOADL: {
-            BytecodeImm bp_offset = readi(&vm);
-            pushw(&vm, loadw(&vm, bp_offset));
-        } break;
 
+        /* Higher-level language support */
         case OP_PRINT: {
-            u8 n_args = read_u8(&vm);
+            u8 n_args = next_u8(&vm);
             /* Must first pop unto an array to maintain correct printing order */
             BytecodeWord args[n_args];
             for (u8 i = 0; i < n_args; i++) {
@@ -171,9 +176,6 @@ u32 run(Bytecode bytecode)
             printf("\n");
         } break;
 
-        case OP_RETURN: {
-            goto vm_loop_done;
-        }
         default:
             printf("Unknown opcode %d\n", instruction);
             goto vm_loop_done;
