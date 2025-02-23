@@ -86,5 +86,7 @@ void str_list_free(Str8List *list);
 u32 str_list_push(Str8List *list, Str8 str);
 u32 str_list_push_cstr(Arena *arena, Str8List *list, char *cstr);
 void str_list_print(Str8List *list);
+/* The individual strings in the list will be Str8Views into the original Str8 input ! */
+Str8List str_list_from_split(Str8 input, char delim);
 
 #endif /* STR_H */

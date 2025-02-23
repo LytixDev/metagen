@@ -32,6 +32,8 @@ typedef struct {
      */
     bool unlex;
     Token previous;
+
+    u32 stmt_lineno; // The first line number in the source code of the current stmt
 } Parser;
 
 AstRoot *parse(Arena *arena, Arena *lex_arena, ErrorHandler *e, char *input);

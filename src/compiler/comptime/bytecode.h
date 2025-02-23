@@ -80,7 +80,7 @@ typedef struct {
     u32 code_offset;
 
     /* Debug */
-    HashMap blame; // Key: index of an instruction, value: line of source code
+    s64 source_lines[4094];
 } Bytecode;
 
 typedef struct locals_t Locals;
@@ -103,7 +103,7 @@ typedef struct {
 
 
 Bytecode ast_to_bytecode(SymbolTable symt_root, AstRoot *root);
-void disassemble(Bytecode b);
+void disassemble(Bytecode b, Str8 source);
 
 Bytecode fib_test(void);
 

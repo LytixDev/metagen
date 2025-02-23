@@ -347,15 +347,17 @@ static AstList *parse_expr_list(Parser *parser)
 static AstWhile *parse_while(Parser *parser)
 {
     /* Came from TOKEN_WHILE */
+    u32 first_lineno = parser->stmt_lineno;
     AstExpr *condition = (AstExpr *)parse_relation(parser);
     consume_or_err(parser, TOKEN_DO, "Expected 'do' keyword to start the while-loop");
     AstStmt *body = parse_stmt(parser);
-    return make_while(parser->arena, condition, body);
+    return make_while(parser->arena, condition, body, first_lineno);
 }
 
 static AstIf *parse_if(Parser *parser)
 {
     /* Came from TOKEN_IF */
+    u32 first_lineno = parser->stmt_lineno;
     AstExpr *condition = (AstExpr *)parse_relation(parser);
     consume_or_err(parser, TOKEN_THEN, "Expected 'then' keyword after if-statement condition");
     AstStmt *then = parse_stmt(parser);
@@ -363,12 +365,13 @@ static AstIf *parse_if(Parser *parser)
     if (match_token(parser, TOKEN_ELSE)) {
         else_ = parse_stmt(parser);
     }
-    return make_if(parser->arena, condition, then, else_);
+    return make_if(parser->arena, condition, then, else_, first_lineno);
 }
 
 static AstBlock *parse_block(Parser *parser)
 {
     /* Came from TOKEN_BLOCK */
+    u32 first_lineno = parser->stmt_lineno;
     TypedIdentList declarations = { 0 };
     if (match_token(parser, TOKEN_VAR)) {
         declarations = parse_local_decl_list(parser);
@@ -392,7 +395,7 @@ static AstBlock *parse_block(Parser *parser)
     if (next.kind != TOKEN_EOF) {
         next_token(parser);
     }
-    return make_block(parser->arena, declarations, stmts);
+    return make_block(parser->arena, declarations, stmts, first_lineno);
 }
 
 static AstAssignment *parse_assignment(Parser *parser, AstExpr *left)
@@ -405,12 +408,13 @@ static AstAssignment *parse_assignment(Parser *parser, AstExpr *left)
     }
 
     AstExpr *right = parse_expr(parser, 0);
-    return make_assignment(parser->arena, left, right);
+    return make_assignment(parser->arena, left, right, parser->stmt_lineno);
 }
 
 static AstStmt *parse_stmt(Parser *parser)
 {
     Token token = next_token(parser);
+    parser->stmt_lineno = token.start.l;
     switch (token.kind) {
     case TOKEN_WHILE:
         return (AstStmt *)parse_while(parser);
@@ -419,25 +423,27 @@ static AstStmt *parse_stmt(Parser *parser)
     case TOKEN_PRINT: {
         AstList *print_list = parse_expr_list(parser);
         print_list->kind = (AstNodeKind)STMT_PRINT;
+        print_list->line = parser->stmt_lineno;
         return (AstStmt *)print_list;
     }
     case TOKEN_RETURN: {
         AstExpr *expr = parse_expr(parser, 0);
-        return (AstStmt *)make_single(parser->arena, STMT_RETURN, (AstNode *)expr);
+        return (AstStmt *)make_single(parser->arena, STMT_RETURN, (AstNode *)expr,
+                                      parser->stmt_lineno);
     }
     case TOKEN_IDENTIFIER: {
         Token next = peek_token(parser);
         if (next.kind == TOKEN_LPAREN) {
             /* Function call, promoted to a statement */
             AstNode *call = (AstNode *)parse_call(parser, token, false);
-            return (AstStmt *)make_single(parser->arena, STMT_EXPR, call);
+            return (AstStmt *)make_single(parser->arena, STMT_EXPR, call, parser->stmt_lineno);
         }
         break; /* Can still be the LHS of an assignment */
     }
     case TOKEN_BREAK:
-        return (AstStmt *)make_single(parser->arena, STMT_BREAK, NULL);
+        return (AstStmt *)make_single(parser->arena, STMT_BREAK, NULL, parser->stmt_lineno);
     case TOKEN_CONTINUE:
-        return (AstStmt *)make_single(parser->arena, STMT_CONTINUE, NULL);
+        return (AstStmt *)make_single(parser->arena, STMT_CONTINUE, NULL, parser->stmt_lineno);
     case TOKEN_BEGIN:
         return (AstStmt *)parse_block(parser);
     default:
