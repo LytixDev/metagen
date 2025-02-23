@@ -24,7 +24,7 @@
 #include "compiler/type.h"
 
 typedef s64 BytecodeWord;
-typedef u16 BytecodeImm; // Value immeditely preceeding certain instructions
+typedef s16 BytecodeImm; // Value immeditely preceeding certain instructions
 
 /*
  * Function prologue:
@@ -58,14 +58,18 @@ typedef enum {
     OP_BNZ, // pop and add imm to ip if popped value is not zero
 
     /* stack operations */
-    OP_CONSW, // push next word
-    OP_PUSHN, // make space for n words words
-    OP_POPN, // remove space for n words
-    OP_LOADI, // push value at imm + bp
-    OP_STOREI, // pop and store value at imm + bp
+    OP_CONSTANTW, // push next word
+    OP_PUSHNW, // make space for n words
+    OP_POPNW, // remove space for n words
+    OP_LDBP, // bp-relative + immediate stack load
+    OP_STBP, // bp-relative + immediate stack store
+    OP_LDA, // stack load @ next word
+    OP_STA, // stack store @ next word
 
     OP_PRINT,
-    OP_RETURN,
+    OP_CALL, // TODO
+    OP_FUNCPRO, // TODO
+    OP_RET, // TODO
 
     OP_TYPE_LEN,
 } OpCode;
@@ -83,10 +87,13 @@ typedef struct {
     s64 source_lines[4094];
 } Bytecode;
 
-typedef struct locals_t Locals;
-struct locals_t {
-    HashMap map; // Key: Symbol identfier, Value: code_offset + 1 (so we can use 0x0 as NULL).
-    Locals *parent;
+/*
+ * Each function get
+ */
+typedef struct stack_vars_t StackVars;
+struct stack_vars_t {
+    HashMap map; // Key: Symbol identfier, Value: offset from bp
+    StackVars *parent;
 };
 
 typedef enum {
@@ -97,7 +104,7 @@ typedef enum {
 typedef struct {
     SymbolTable symt_root;
     Bytecode bytecode;
-    Locals *locals; /* NOTE: Root Locals object also stores global functions and variables */
+    StackVars *vars; /* NOTE: Root object stores global functions and variables */
     BytecodeCompilerFlags flags;
 } BytecodeCompiler;
 

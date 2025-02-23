@@ -24,9 +24,9 @@
 #include <stdio.h>
 
 char *op_code_str_map[OP_TYPE_LEN] = {
-    "OP_ADDW", "OP_SUBW",  "OP_MULW",   "OP_DIVW",  "OP_LSHIFT", "OP_RSHIFT", "OP_GE",
-    "OP_LE",   "OP_NOT",   "OP_JMP",    "OP_BIZ",   "OP_BNZ",    "OP_CONSW",  "OP_PUSHN",
-    "OP_POPN", "OP_LOADI", "OP_STOREI", "OP_PRINT", "OP_RETURN",
+    "ADDW", "SUBW",  "MULW",   "DIVW",  "LSHIFT", "RSHIFT", "GE",
+    "LE",   "NOT",   "JMP",    "BIZ",   "BNZ",    "CONSTANTW",  "PUSHNW",
+    "POPNW", "LDBP", "STBP", "LDA", "STA", "PRINT", "CALL", "FUNCPRO", "RET",
 };
 
 
@@ -54,18 +54,18 @@ static void disassemble_instruction(Bytecode *b, Str8List source_lines)
         u32 current_offset = b->code_offset;
         BytecodeImm value = *(BytecodeImm *)(b->code + b->code_offset);
         b->code_offset += sizeof(BytecodeImm);
-        printed_chars += printf(" %d", value + current_offset + 1);
+        printed_chars += printf(" %d", value + current_offset + 2);
     }; break;
-    case OP_POPN:
-    case OP_PUSHN:
-    case OP_LOADI:
-    case OP_STOREI: {
+    case OP_POPNW:
+    case OP_PUSHNW:
+    case OP_LDBP:
+    case OP_STBP: {
         BytecodeImm value = *(BytecodeImm *)(b->code + b->code_offset);
         b->code_offset += sizeof(BytecodeImm);
         printed_chars += printf(" %d", value);
     }; break;
     // case OP_JMP:
-    case OP_CONSW: {
+    case OP_CONSTANTW: {
         BytecodeWord value = *(BytecodeWord *)(b->code + b->code_offset);
         b->code_offset += sizeof(BytecodeWord);
         printed_chars += printf(" %ld", value);
@@ -79,7 +79,7 @@ static void disassemble_instruction(Bytecode *b, Str8List source_lines)
     }
 
     if (source_line != -1) {
-        printf("%zu", source_line + 1);
+        printf("%-3zu", source_line + 1);
         /* Ensures we only write each source line once */
         if (source_line > lines_written) {
             /* Do not print indent */
@@ -88,7 +88,7 @@ static void disassemble_instruction(Bytecode *b, Str8List source_lines)
             while (line.str[indents] == ' ') { // NOTE. What about tabs?
                 indents++;
             }
-            printf(": %.*s ", (int)(line.len - indents), line.str + indents);
+            printf(" %.*s ", (int)(line.len - indents), line.str + indents);
         }
         lines_written = source_line;
     }
@@ -142,9 +142,9 @@ static void patchi(Bytecode *b, u32 offset, BytecodeImm value)
     *(BytecodeImm *)(b->code + offset) = value;
 }
 
-static Locals *make_locals(Locals *parent)
+static StackVars *make_locals(StackVars *parent)
 {
-    Locals *locals = malloc(sizeof(Locals));
+    StackVars *locals = malloc(sizeof(StackVars));
     locals->parent = parent;
     hashmap_init(&locals->map);
     return locals;
@@ -152,7 +152,7 @@ static Locals *make_locals(Locals *parent)
 
 static BytecodeImm find_ident_offset(BytecodeCompiler *compiler, Str8 ident)
 {
-    for (Locals *locals = compiler->locals; locals; locals = locals->parent) {
+    for (StackVars *locals = compiler->vars; locals; locals = locals->parent) {
         BytecodeImm *offset = hashmap_get(&locals->map, ident.str, ident.len);
         if (offset != NULL) {
             return (BytecodeImm)offset - 1;
@@ -166,17 +166,36 @@ static void bytecode_compiler_init(BytecodeCompiler *compiler, SymbolTable symt_
     compiler->bytecode.code_offset = 0;
     compiler->symt_root = symt_root;
     compiler->flags = BCF_LOAD_IDENT;
-    compiler->locals = make_locals(NULL);
+    compiler->vars = make_locals(NULL);
 }
 
 static void bytecode_compiler_free(BytecodeCompiler *compiler)
 {
-    for (Locals *locals = compiler->locals; locals != NULL;) {
+    for (StackVars *locals = compiler->vars; locals != NULL;) {
         hashmap_free(&locals->map);
-        Locals *old = locals;
+        StackVars *old = locals;
         locals = locals->parent;
         free(old);
     }
+}
+
+static BytecodeImm number_of_new_stack_variables(SymbolTable *symt, StackVars *locals)
+{
+    /* Make space for each local variable */
+    //u32 var_space = 0;
+    //for (u32 i = 0; i < symt->sym_len; i++) {
+    //    Symbol *sym = symt->symbols[i];
+    //    if (sym->kind == SYMBOL_LOCAL_VAR) {
+    //        hashmap_put(&locals->map, sym->name.str, sym->name.len,
+    //                    (void *)(compiler->bytecode.code_offset + var_space + 1),
+    //                    sizeof(void *), false);
+    //        // TODO: align? Question of performance.
+    //        var_space += type_info_bit_size(sym->type_info);
+    //    }
+    //}
+    //u32 var_space_in_words = (var_space + sizeof(BytecodeWord) - 1) / sizeof(BytecodeWord);
+    //return var_space_in_words;
+    return 0;
 }
 
 static void ast_expr_to_bytecode(BytecodeCompiler *compiler, AstExpr *head)
@@ -220,11 +239,11 @@ static void ast_expr_to_bytecode(BytecodeCompiler *compiler, AstExpr *head)
         AstLiteral *expr = AS_LITERAL(head);
         if (expr->lit_type == LIT_NUM) {
             u32 literal = str_view_to_u32(expr->literal, NULL);
-            write_instruction(&compiler->bytecode, OP_CONSW, debug_line);
+            write_instruction(&compiler->bytecode, OP_CONSTANTW, debug_line);
             writew(&compiler->bytecode, literal);
         } else if (expr->lit_type == LIT_IDENT) {
             write_instruction(&compiler->bytecode,
-                              compiler->flags == BCF_STORE_IDENT ? OP_STOREI : OP_LOADI,
+                              compiler->flags == BCF_STORE_IDENT ? OP_STBP : OP_LDBP,
                               debug_line);
             writei(&compiler->bytecode, find_ident_offset(compiler, expr->sym->name));
         } else {
@@ -259,7 +278,7 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *compiler, AstStmt *head)
         ast_stmt_to_bytecode(compiler, if_->then);
         /* Skip the else branch */
         if (if_->else_) {
-            endif_target = write_instruction(&compiler->bytecode, OP_CONSW, head->line);
+            endif_target = write_instruction(&compiler->bytecode, OP_CONSTANTW, head->line);
             writew(&compiler->bytecode, 0);
             write_instruction(&compiler->bytecode, OP_JMP, head->line);
         }
@@ -283,7 +302,7 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *compiler, AstStmt *head)
         /* Loop body */
         ast_stmt_to_bytecode(compiler, while_->body);
         /* Jump back to the condition */
-        write_instruction(&compiler->bytecode, OP_CONSW, head->line);
+        write_instruction(&compiler->bytecode, OP_CONSTANTW, head->line);
         writew(&compiler->bytecode, (BytecodeWord)condition_target);
         write_instruction(&compiler->bytecode, OP_JMP, head->line);
         /* Patch the skip body jump */
@@ -295,14 +314,14 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *compiler, AstStmt *head)
         bool no_new_syms = block->symt_local->sym_len == 0;
         u32 var_space_in_words = 0;
         if (!no_new_syms) {
-            compiler->locals = make_locals(compiler->locals);
+            compiler->vars = make_locals(compiler->vars);
             /* Make space for each local variable */
             u32 var_space = 0;
             SymbolTable *symt = block->symt_local;
             for (u32 i = 0; i < symt->sym_len; i++) {
                 Symbol *sym = symt->symbols[i];
                 if (sym->kind == SYMBOL_LOCAL_VAR) {
-                    hashmap_put(&compiler->locals->map, sym->name.str, sym->name.len,
+                    hashmap_put(&compiler->vars->map, sym->name.str, sym->name.len,
                                 (void *)(compiler->bytecode.code_offset + var_space + 1),
                                 sizeof(void *), false);
                     // TODO: align? Question of performance.
@@ -310,7 +329,7 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *compiler, AstStmt *head)
                 }
             }
             var_space_in_words = (var_space + sizeof(BytecodeWord) - 1) / sizeof(BytecodeWord);
-            write_instruction(&compiler->bytecode, OP_PUSHN, head->line);
+            write_instruction(&compiler->bytecode, OP_PUSHNW, head->line);
             writei(&compiler->bytecode, (BytecodeImm)var_space_in_words);
         }
 
@@ -320,10 +339,10 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *compiler, AstStmt *head)
         }
 
         if (!no_new_syms) {
-            write_instruction(&compiler->bytecode, OP_POPN, head->line);
+            write_instruction(&compiler->bytecode, OP_POPNW, head->line);
             writei(&compiler->bytecode, (BytecodeImm)var_space_in_words);
-            Locals *old = compiler->locals;
-            compiler->locals = old->parent;
+            StackVars *old = compiler->vars;
+            compiler->vars = old->parent;
             hashmap_free(&old->map);
             free(old);
         }
@@ -361,7 +380,7 @@ void ast_func_to_bytecode(BytecodeCompiler *compiler, AstFunc *func)
     ast_stmt_to_bytecode(compiler, func->body);
 
     /* Function epilogue */
-    write_instruction(&compiler->bytecode, OP_RETURN, (s64)-1);
+    write_instruction(&compiler->bytecode, OP_RET, (s64)-1);
 }
 
 Bytecode ast_to_bytecode(SymbolTable symt_root, AstRoot *root)
@@ -369,6 +388,9 @@ Bytecode ast_to_bytecode(SymbolTable symt_root, AstRoot *root)
     assert(root->funcs.head != NULL);
     BytecodeCompiler compiler;
     bytecode_compiler_init(&compiler, symt_root);
+
+    /* Make space for global varibales */
+    // root->vars;
 
     for (AstListNode *node = root->funcs.head; node != NULL; node = node->next) {
         ast_func_to_bytecode(&compiler, AS_FUNC(node->this));

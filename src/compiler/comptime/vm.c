@@ -134,28 +134,28 @@ u32 run(Bytecode bytecode)
                 vm.ip += target;
             }
         } break;
-        case OP_RETURN: {
+        case OP_RET: {
             goto vm_loop_done;
         }
 
         /* Stack manipulation */
-        case OP_CONSW: {
+        case OP_CONSTANTW: {
             BytecodeWord value = nextw(&vm);
             pushw(&vm, value);
         }; break;
-        case OP_PUSHN: {
+        case OP_PUSHNW: {
             BytecodeImm n_words = nexti(&vm);
             pushn(&vm, n_words);
         } break;
-        case OP_POPN: {
+        case OP_POPNW: {
             BytecodeImm n_words = nexti(&vm);
             popn(&vm, n_words);
         } break;
-        case OP_LOADI: {
+        case OP_LDBP: {
             BytecodeImm bp_offset = nexti(&vm);
             pushw(&vm, loadw(&vm, bp_offset));
         } break;
-        case OP_STOREI: {
+        case OP_STBP: {
             BytecodeImm bp_offset = nexti(&vm);
             BytecodeWord value = popw(&vm);
             storew(&vm, bp_offset, value);
