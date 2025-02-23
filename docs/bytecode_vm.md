@@ -11,8 +11,8 @@ Goals:
 
 What we need:
 - Bytecode compiler tracks bp-relative position of each variable in scope
-    - Also includes a potential return value and potential arguments
 - call, funcpro, ret, bp-relative stack loads/store instructions
+
 
 var glob: s32
 

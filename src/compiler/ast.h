@@ -212,7 +212,7 @@ typedef struct {
     AstNodeKind kind;
     Str8 name;
     TypedIdentList parameters;
-    AstTypeInfo return_type;
+    AstTypeInfo ast_return_type; // Not the actual return type, only the ast info needed to infer it
     AstStmt *body; // @NULLABLE. If NULL then the function is a compiler
 } AstFunc;
 

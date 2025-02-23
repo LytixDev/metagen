@@ -88,11 +88,12 @@ typedef struct {
 } Bytecode;
 
 /*
- * Each function get
+ * Each function gets their own.
+ * Each scope gets their own.
  */
 typedef struct stack_vars_t StackVars;
 struct stack_vars_t {
-    HashMap map; // Key: Symbol identfier, Value: offset from bp
+    HashMap map; // Key: Symbol name, Value: offset from bp
     StackVars *parent;
 };
 
@@ -104,7 +105,13 @@ typedef enum {
 typedef struct {
     SymbolTable symt_root;
     Bytecode bytecode;
-    StackVars *vars; /* NOTE: Root object stores global functions and variables */
+
+    StackVars *stack_vars;
+    s64 bp_stack_offset;
+
+    HashMap globals; // Key: Symbol name, Value: Absolute position in the stack
+    HashMap functions; // Key: Symbol name, Value: Absolute position of first instruction in code
+
     BytecodeCompilerFlags flags;
 } BytecodeCompiler;
 

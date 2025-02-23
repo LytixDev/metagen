@@ -133,7 +133,7 @@ AstFunc *make_func(Arena *a, Str8View name, TypedIdentList params, AstStmt *body
     func->kind = AST_FUNC;
     func->name = name;
     func->parameters = params;
-    func->return_type = return_type;
+    func->ast_return_type = return_type;
     func->body = body;
     return func;
 }
