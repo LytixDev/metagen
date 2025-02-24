@@ -16,6 +16,7 @@
  */
 #include "compiler/comptime/bytecode.h"
 #include "base/str.h"
+#include "base/types.h"
 #include "compiler/ast.h"
 #include "compiler/compiler.h"
 #include "compiler/type.h"
@@ -163,22 +164,31 @@ static void free_all_stack_vars(StackVars *s)
 
 static void stack_vars_set(StackVars *s, Str8 name, s64 bp_rel_offset)
 {
+    /*
+     * For storing in the map, we ensure each value is larger than 0.
+     * Otherwise, a bp_rel_offset of 0 would be treated as the NULL pointer.
+     */
+    bp_rel_offset += STACK_VAR_MAP_ADD;
     hashmap_put(&s->map, name.str, name.len, (void *)(bp_rel_offset), sizeof(void *), false);
 }
 
-static s64 stack_vars_get(StackVars *s, Str8 name)
+static BytecodeImm stack_vars_get(BytecodeCompiler *bc, Str8 name)
 {
-    void *value = hashmap_get(&s->map, name.str, name.len);
-    if (value == NULL) {
-        // error
-        fprintf(stderr, "PANIC!\n");
-        return 0;
+    for (StackVars *locals = bc->stack_vars; locals; locals = locals->parent) {
+        BytecodeImm *offset = hashmap_get(&locals->map, name.str, name.len);
+        if (offset != NULL) {
+            return (BytecodeImm)(((size_t)offset) - STACK_VAR_MAP_ADD);
+        }
     }
-    return (s64)(size_t)value;
+    ASSERT_NOT_REACHED;
 }
 
 static void stack_vars_print(StackVars *s)
 {
+    if (s->parent != NULL) {
+        stack_vars_print(s->parent);
+    }
+
     HashMap m = s->map;
     for (int i = 0; i < N_BUCKETS(m.size_log2); i++) {
         struct hm_bucket_t *bucket = &m.buckets[i];
@@ -188,21 +198,10 @@ static void stack_vars_print(StackVars *s)
                 continue;
 
             Str8 key = (Str8){ .str = entry.key, .len = entry.key_size };
-            s64 val = (s64)entry.value;
+            s64 val = ((s64)entry.value) - STACK_VAR_MAP_ADD;
             printf("%ld - %s\n", val, key.str);
         }
     }
-}
-
-static BytecodeImm find_ident_offset(BytecodeCompiler *bc, Str8 ident)
-{
-    for (StackVars *locals = bc->stack_vars; locals; locals = locals->parent) {
-        BytecodeImm *offset = hashmap_get(&locals->map, ident.str, ident.len);
-        if (offset != NULL) {
-            return (BytecodeImm)offset - 1;
-        }
-    }
-    ASSERT_NOT_REACHED;
 }
 
 static void bytecode_compiler_init(BytecodeCompiler *bc, SymbolTable symt_root)
@@ -212,7 +211,6 @@ static void bytecode_compiler_init(BytecodeCompiler *bc, SymbolTable symt_root)
     bc->flags = BCF_LOAD_IDENT;
     hashmap_init(&bc->globals);
     hashmap_init(&bc->functions);
-    // compiler->stack_vars = make_locals(NULL);
 }
 
 static void bytecode_compiler_free(BytecodeCompiler *bc)
@@ -227,23 +225,21 @@ static void bytecode_compiler_free(BytecodeCompiler *bc)
     // }
 }
 
-static BytecodeImm number_of_new_stack_variables(SymbolTable *symt, StackVars *locals)
+static BytecodeImm new_stack_vars_from_block(BytecodeCompiler *bc, SymbolTable *symt)
 {
-    /* Make space for each local variable */
-    // u32 var_space = 0;
-    // for (u32 i = 0; i < symt->sym_len; i++) {
-    //     Symbol *sym = symt->symbols[i];
-    //     if (sym->kind == SYMBOL_LOCAL_VAR) {
-    //         hashmap_put(&locals->map, sym->name.str, sym->name.len,
-    //                     (void *)(compiler->bytecode.code_offset + var_space + 1),
-    //                     sizeof(void *), false);
-    //         // TODO: align? Question of performance.
-    //         var_space += type_info_bit_size(sym->type_info);
-    //     }
-    // }
-    // u32 var_space_in_words = (var_space + sizeof(BytecodeWord) - 1) / sizeof(BytecodeWord);
-    // return var_space_in_words;
-    return 0;
+    bc->stack_vars = make_stack_vars(bc->stack_vars);
+    s64 bp_offset_pre = bc->bp_stack_offset;
+    for (u32 i = 0; i < symt->sym_len; i++) {
+        Symbol *sym = symt->symbols[i];
+        if (sym->kind == SYMBOL_LOCAL_VAR) {
+            stack_vars_set(bc->stack_vars, sym->name, bc->bp_stack_offset);
+            bc->bp_stack_offset += type_info_byte_size(sym->type_info);
+        }
+    }
+    s64 bp_added_offset = bc->bp_stack_offset - bp_offset_pre;
+    s64 var_space_in_words = (bp_added_offset + sizeof(BytecodeWord) - 1) / sizeof(BytecodeWord);
+    // TODO: if var_space_in_words not addressable by s64, error
+    return (BytecodeImm)var_space_in_words;
 }
 
 static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
@@ -292,7 +288,7 @@ static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
         } else if (expr->lit_type == LIT_IDENT) {
             write_instruction(&bc->bytecode, bc->flags == BCF_STORE_IDENT ? OP_STBP : OP_LDBP,
                               debug_line);
-            writei(&bc->bytecode, find_ident_offset(bc, expr->sym->name));
+            writei(&bc->bytecode, stack_vars_get(bc, expr->sym->name));
         } else {
             printf("Ast literal expr kind not handled\n");
         }
@@ -359,36 +355,23 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *bc, AstStmt *head)
     case STMT_BLOCK: {
         // TODO: use proper BP offset !
         AstBlock *block = AS_BLOCK(head);
-        bool no_new_syms = block->symt_local->sym_len == 0;
-        u32 var_space_in_words = 0;
-        if (!no_new_syms) {
-            bc->stack_vars = make_stack_vars(bc->stack_vars);
-            /* Make space for each local variable */
-            u32 var_space = 0;
-            SymbolTable *symt = block->symt_local;
-            for (u32 i = 0; i < symt->sym_len; i++) {
-                Symbol *sym = symt->symbols[i];
-                if (sym->kind == SYMBOL_LOCAL_VAR) {
-                    hashmap_put(&bc->stack_vars->map, sym->name.str, sym->name.len,
-                                (void *)(bc->bytecode.code_offset + var_space + 1), sizeof(void *),
-                                false);
-                    // TODO: align? Question of performance.
-                    var_space += type_info_bit_size(sym->type_info);
-                }
-            }
-            var_space_in_words = (var_space + sizeof(BytecodeWord) - 1) / sizeof(BytecodeWord);
+        bool new_vars = block->symt_local->sym_len > 0;
+        BytecodeImm var_space_in_words = 0;
+        if (new_vars) {
+            var_space_in_words = new_stack_vars_from_block(bc, block->symt_local);
+            stack_vars_print(bc->stack_vars);
             write_instruction(&bc->bytecode, OP_PUSHNW, head->line);
-            writei(&bc->bytecode, (BytecodeImm)var_space_in_words);
+            writei(&bc->bytecode, var_space_in_words);
         }
 
-        AstList *stmt = block->stmts;
-        for (AstListNode *n = stmt->head; n != NULL; n = n->next) {
+        for (AstListNode *n = block->stmts->head; n != NULL; n = n->next) {
             ast_stmt_to_bytecode(bc, (AstStmt *)n->this);
         }
 
-        if (!no_new_syms) {
+        if (new_vars) {
             write_instruction(&bc->bytecode, OP_POPNW, head->line);
-            writei(&bc->bytecode, (BytecodeImm)var_space_in_words);
+            writei(&bc->bytecode, var_space_in_words);
+            /* Delete stack vars from current block */
             StackVars *old = bc->stack_vars;
             bc->stack_vars = old->parent;
             hashmap_free(&old->map);

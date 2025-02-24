@@ -96,6 +96,11 @@ struct stack_vars_t {
     HashMap map; // Key: Symbol name, Value: offset from bp
     StackVars *parent;
 };
+/*
+ * For storing in the map, we ensure each value is larger than 0.
+ * Otherwise, a bp_rel_offset of 0 would be treated as the NULL pointer.
+ */
+#define STACK_VAR_MAP_ADD (S16_MAX + 2)
 
 typedef enum {
     BCF_STORE_IDENT = 1,
