@@ -103,6 +103,13 @@ u32 type_info_bit_size(TypeInfo *type_info)
     }
 }
 
+u32 type_info_byte_size(TypeInfo *type_info)
+{
+    /* Round up to nereast byte */
+    u32 bit_size = type_info_bit_size(type_info);
+    return (bit_size + (8 - 1)) / 8;
+}
+
 static SymbolTable symt_init(SymbolTable *parent)
 {
     SymbolTable symt = { .sym_len = 0, .sym_cap = 16, .parent = parent };
@@ -283,7 +290,7 @@ static void typegen_from_func_decl(Compiler *c, AstFunc *decl)
     t->info.is_resolved = true; // We will error in this function if it does not resovle
     symt_new_sym(c, &c->symt_root, SYMBOL_FUNC, decl->name, (TypeInfo *)t, (AstNode *)decl);
 
-    TypeInfo *return_type = ast_type_resolve(c, decl->return_type, true);
+    TypeInfo *return_type = ast_type_resolve(c, decl->ast_return_type, true);
     t->return_type = return_type;
 
     for (u32 i = 0; i < decl->parameters.len; i++) {

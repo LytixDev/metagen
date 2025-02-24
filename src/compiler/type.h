@@ -136,6 +136,7 @@ struct symbol_t {
 
 
 u32 type_info_bit_size(TypeInfo *type_info);
+u32 type_info_byte_size(TypeInfo *type_info); // Rounds up
 Symbol *get_sym_by_name(SymbolTable *symt, Str8 key);
 
 void typegen(Compiler *c, AstRoot *root);

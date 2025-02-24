@@ -55,7 +55,7 @@ bool run_compiler_pass(Compiler *c, AstRoot *root, CompilerPass pass, char *name
     return c->e->n_errors > 0;
 }
 
-u32 compile(char *file_name, char *input)
+u32 compile(char *file_name, Str8 source)
 {
     Arena lex_arena;
     Arena persist_arena; /* Data which should persist throughout the lifetime of the compiler */
@@ -65,14 +65,14 @@ u32 compile(char *file_name, char *input)
     m_arena_init_dynamic(&pass_arena, 1, 512);
 
     ErrorHandler e;
-    error_handler_init(&e, input, file_name);
+    error_handler_init(&e, source.str, file_name);
 
     Compiler compiler = { .persist_arena = &persist_arena, .pass_arena = &pass_arena, .e = &e };
     arraylist_init(&compiler.struct_types, sizeof(TypeInfoStruct *));
     arraylist_init(&compiler.all_types, sizeof(TypeInfo *));
 
     /* Frontend */
-    AstRoot *ast_root = parse(&persist_arena, &lex_arena, &e, input);
+    AstRoot *ast_root = parse(&persist_arena, &lex_arena, &e, (char *)source.str);
     for (CompilerError *err = e.head; err != NULL; err = err->next) {
         printf("%s\n", err->msg.str);
     }
@@ -101,7 +101,7 @@ u32 compile(char *file_name, char *input)
     if (options.bytecode_backend && options.run_bytecode) {
         LOG_DEBUG_NOARG("Generating bytecode");
         Bytecode bytecode = ast_to_bytecode(compiler.symt_root, ast_root);
-        disassemble(bytecode);
+        disassemble(bytecode, source);
         run(bytecode);
     } else {
         LOG_DEBUG_NOARG("Generating c-code");
@@ -198,7 +198,7 @@ int main(int argc, char *argv[])
     }
     fclose(fp);
 
-    u32 n_errors = compile(input_file, input);
+    u32 n_errors = compile(input_file, (Str8){ .str = (u8 *)input, .len = input_size });
     free(input);
     if (n_errors == 0) {
         return 0;

@@ -186,3 +186,24 @@ void str_list_print(Str8List *list)
         printf("[%d] %s\n", i, list->strs[i].str);
     }
 }
+
+Str8List str_list_from_split(Str8 input, char delim)
+{
+    Str8List list;
+    str_list_init(&list);
+
+    size_t start = 0;
+    /* Loop including null terminator */
+    for (size_t i = 0; i <= input.len; i++) {
+        if (i == input.len || input.str[i] == delim) {
+            size_t length = i - start;
+            /* Avoid pushing empty string */
+            if (length > 0) {
+                Str8 str = { .len = length, .str = input.str + start };
+                str_list_push(&list, str);
+            }
+            start = i + 1;
+        }
+    }
+    return list;
+}

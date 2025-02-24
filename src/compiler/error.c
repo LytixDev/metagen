@@ -22,7 +22,7 @@
 #include "lex.h"
 #include <string.h>
 
-void error_handler_init(ErrorHandler *e, char *input, char *file_name)
+void error_handler_init(ErrorHandler *e, u8 *input, char *file_name)
 {
     m_arena_init_dynamic(&e->arena, 1, 100);
     e->input = input;

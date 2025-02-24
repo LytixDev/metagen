@@ -64,6 +64,7 @@ typedef Str8 Str8View;
     }
 #define STR8VIEW_EQUAL(a, b) \
     ((a).len == (b).len && ((a).len == 0 || memcmp((a).str, (b).str, (a).len) == 0))
+#define STR8_EQUAL(a, b) (STR8VIEW_EQUAL((a), (b)))
 
 #define STR8_LIT(literal)                    \
     (Str8)                                   \
@@ -86,5 +87,7 @@ void str_list_free(Str8List *list);
 u32 str_list_push(Str8List *list, Str8 str);
 u32 str_list_push_cstr(Arena *arena, Str8List *list, char *cstr);
 void str_list_print(Str8List *list);
+/* The individual strings in the list will be Str8Views into the original Str8 input ! */
+Str8List str_list_from_split(Str8 input, char delim);
 
 #endif /* STR_H */
