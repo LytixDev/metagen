@@ -9,7 +9,9 @@ Goals:
 
 ## Bytecode:
 
-What we need:
+DOING RIGHTNOW:
+- Struct member padding
+- Struct member access (load and store)
 - Bytecode compiler tracks bp-relative position of each variable in scope
 - call, funcpro, ret, bp-relative stack loads/store instructions
 
@@ -44,7 +46,6 @@ The VM consits of four mutable properties:
 
 ### Execution
 The VM executes one instruction at a time until it reaches the OP_EXIT instruction. The next instruction is determined by the ip. The ip is incremented upon reading an instruction, but can also be changed by branch and jump instructions.
-
 
 ### Function Prologue and Epilogue
 

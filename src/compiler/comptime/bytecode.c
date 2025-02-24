@@ -18,7 +18,6 @@
 #include "base/str.h"
 #include "base/types.h"
 #include "compiler/ast.h"
-#include "compiler/compiler.h"
 #include "compiler/type.h"
 #include <assert.h>
 #include <stdbool.h>
@@ -26,8 +25,8 @@
 
 char *op_code_str_map[OP_TYPE_LEN] = {
     "ADDW", "SUBW", "MULW", "DIVW",  "LSHIFT",    "RSHIFT",  "GE",    "LE",
-    "NOT",  "JMP",  "BIZ",  "BNZ",   "CONSTANTW", "PUSHNW",  "POPNW", "LDBP",
-    "STBP", "LDA",  "STA",  "PRINT", "CALL",      "FUNCPRO", "RET",
+    "NOT",  "JMP",  "BIZ",  "BNZ",   "CONSTANTW", "PUSHNW",  "POPNW", "LDBPW",
+    "STBPW", "LDAW",  "STAW",  "PRINT", "CALL",      "FUNCPRO", "RET",
 };
 
 
@@ -60,8 +59,8 @@ static void disassemble_instruction(Bytecode *b, Str8List source_lines)
     }; break;
     case OP_POPNW:
     case OP_PUSHNW:
-    case OP_LDBP:
-    case OP_STBP: {
+    case OP_LDBPW:
+    case OP_STBPW: {
         BytecodeImm value = *(BytecodeImm *)(b->code + b->code_offset);
         b->code_offset += sizeof(BytecodeImm);
         printed_chars += printf(" %d", value);
@@ -85,7 +84,7 @@ static void disassemble_instruction(Bytecode *b, Str8List source_lines)
         /* Ensures we only write each source line once */
         if (source_line > lines_written) {
             /* Do not print indent */
-            Str8 line = source_lines.strs[source_line];
+            Str8 line = source_lines.strs[source_line - 1];
             size_t indents = 0;
             while (line.str[indents] == ' ') { // NOTE. What about tabs?
                 indents++;
@@ -242,6 +241,32 @@ static BytecodeImm new_stack_vars_from_block(BytecodeCompiler *bc, SymbolTable *
     return (BytecodeImm)var_space_in_words;
 }
 
+static void ast_expr_access_struct_member(BytecodeCompiler *bc, AstBinary *expr)
+{
+    // TODO: struct packing ! Also, struct member offsets are in bits !
+    assert(expr->op == TOKEN_DOT);
+    assert(expr->left->kind == EXPR_LITERAL); // TODO: Later on, this can be anything
+    assert(expr->right->kind == EXPR_LITERAL);
+
+    AstLiteral *struct_lit = (AstLiteral *)expr->left;
+    AstLiteral *struct_member = (AstLiteral *)expr->right;
+    TypeInfoStruct *struct_type = (TypeInfoStruct *)struct_lit->type;
+    
+    s64 member_offset = -1;
+    for (u32 i = 0; i < struct_type->members_len; i++) {
+        TypeInfoStructMember *member = struct_type->members[i];
+        if (STR8VIEW_EQUAL(member->name, struct_member->sym->name)) {
+            member_offset = member->offset;
+        }
+    }
+    assert(member_offset != -1);
+
+    BytecodeImm bp_offset = stack_vars_get(bc, struct_lit->sym->name);
+    bp_offset += member_offset / 8; 
+    write_instruction(&bc->bytecode, bc->flags == BCF_STORE_IDENT ? OP_STBPW : OP_LDBPW, debug_line);
+    writei(&bc->bytecode, bp_offset);
+}
+
 static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
 {
     switch (head->kind) {
@@ -252,6 +277,10 @@ static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
         AstBinary *expr = AS_BINARY(head);
         // NOTE: we only support integers right now
         assert(expr->type->kind == TYPE_INTEGER);
+        if (expr->op == TOKEN_DOT) {
+            ast_expr_access_struct_member(bc, expr);
+            break;
+        }
         ast_expr_to_bytecode(bc, expr->right);
         ast_expr_to_bytecode(bc, expr->left);
         switch (expr->op) {
@@ -286,7 +315,7 @@ static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
             write_instruction(&bc->bytecode, OP_CONSTANTW, debug_line);
             writew(&bc->bytecode, literal);
         } else if (expr->lit_type == LIT_IDENT) {
-            write_instruction(&bc->bytecode, bc->flags == BCF_STORE_IDENT ? OP_STBP : OP_LDBP,
+            write_instruction(&bc->bytecode, bc->flags == BCF_STORE_IDENT ? OP_STBPW : OP_LDBPW,
                               debug_line);
             writei(&bc->bytecode, stack_vars_get(bc, expr->sym->name));
         } else {
@@ -359,7 +388,7 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *bc, AstStmt *head)
         BytecodeImm var_space_in_words = 0;
         if (new_vars) {
             var_space_in_words = new_stack_vars_from_block(bc, block->symt_local);
-            stack_vars_print(bc->stack_vars);
+            // stack_vars_print(bc->stack_vars);
             write_instruction(&bc->bytecode, OP_PUSHNW, head->line);
             writei(&bc->bytecode, var_space_in_words);
         }

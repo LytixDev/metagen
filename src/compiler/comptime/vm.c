@@ -82,7 +82,7 @@ u32 run(Bytecode bytecode)
     vm.b = bytecode;
     vm.ip = bytecode.code;
     vm.sp = (u8 *)vm.stack;
-    // vm.bp = 0;
+    vm.bp = 0;
     // vm.flags = 0;
 
     while (1) {
@@ -151,14 +151,14 @@ u32 run(Bytecode bytecode)
             BytecodeImm n_words = nexti(&vm);
             popn(&vm, n_words);
         } break;
-        case OP_LDBP: {
+        case OP_LDBPW: {
             BytecodeImm bp_offset = nexti(&vm);
-            pushw(&vm, loadw(&vm, bp_offset));
+            pushw(&vm, loadw(&vm, vm.bp + bp_offset));
         } break;
-        case OP_STBP: {
+        case OP_STBPW: {
             BytecodeImm bp_offset = nexti(&vm);
             BytecodeWord value = popw(&vm);
-            storew(&vm, bp_offset, value);
+            storew(&vm, vm.bp + bp_offset, value);
         } break;
 
         /* Higher-level language support */

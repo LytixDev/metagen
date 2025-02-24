@@ -31,6 +31,7 @@ typedef struct {
     u8 *ip;
 
     BytecodeWord stack[STACK_MAX];
+    /* Byte-addressable */
     u8 *sp;
     u8 bp;
 

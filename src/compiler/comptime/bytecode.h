@@ -61,10 +61,10 @@ typedef enum {
     OP_CONSTANTW, // push next word
     OP_PUSHNW, // make space for n words
     OP_POPNW, // remove space for n words
-    OP_LDBP, // bp-relative + immediate stack load
-    OP_STBP, // bp-relative + immediate stack store
-    OP_LDA, // stack load @ next word
-    OP_STA, // stack store @ next word
+    OP_LDBPW, // bp-relative + immediate stack load
+    OP_STBPW, // bp-relative + immediate stack store
+    OP_LDAW, // stack load @ next word
+    OP_STAW, // stack store @ next word
 
     OP_PRINT,
     OP_CALL, // TODO
