@@ -30,10 +30,9 @@ typedef struct {
     Bytecode b;
     u8 *ip;
 
-    BytecodeWord stack[STACK_MAX];
-    /* Byte-addressable */
+    u8 stack[STACK_MAX * 8]; // Byte-addressable stack
     u8 *sp;
-    u8 bp;
+    BytecodeWord bp; // Base pointer as an index / offset
 
     VMFlags flags;
 } MetagenVM;

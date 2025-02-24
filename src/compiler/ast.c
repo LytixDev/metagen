@@ -197,6 +197,7 @@ AstRoot *make_root(Arena *a, AstList vars, AstList funcs, AstList structs, AstLi
 {
     AstRoot *root = m_arena_alloc(a, sizeof(AstRoot));
     root->kind = AST_ROOT;
+    root->main_function = NULL;
     root->vars = vars;
     root->funcs = funcs;
     root->structs = structs;

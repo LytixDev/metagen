@@ -66,14 +66,16 @@ static BytecodeWord popn(MetagenVM *vm, BytecodeImm n)
     return *vm->sp;
 }
 
-static BytecodeWord loadw(MetagenVM *vm, BytecodeImm bp_offset)
+static BytecodeWord ldw(MetagenVM *vm, BytecodeWord byte_offset)
 {
-    return vm->stack[vm->bp + bp_offset];
+    // return vm->stack[offset];
+    return *(BytecodeWord *)(vm->stack + byte_offset);
 }
 
-static void storew(MetagenVM *vm, BytecodeImm bp_offset, BytecodeWord value)
+static void stw(MetagenVM *vm, BytecodeWord byte_offset, BytecodeWord value)
 {
-    vm->stack[vm->bp + bp_offset] = value;
+    // vm->stack[offset] = value;
+    *(BytecodeWord *)(vm->stack + byte_offset) = value;
 }
 
 u32 run(Bytecode bytecode)
@@ -85,8 +87,11 @@ u32 run(Bytecode bytecode)
     vm.bp = 0;
     // vm.flags = 0;
 
+    BytecodeWord stack_start = (BytecodeWord)vm.sp;
+
     while (1) {
-        // printf(">%d %s\n", vm.ip - bytecode.code, op_code_str_map[*vm.ip]);
+        // printf("ip:%d sp:%d, bp:%d %s\n", vm.ip - bytecode.code, vm.sp - stack_start, vm.bp,
+        // op_code_str_map[*vm.ip]);
         OpCode instruction;
         switch (instruction = *vm.ip++) {
         /* Arithmetic */
@@ -134,9 +139,6 @@ u32 run(Bytecode bytecode)
                 vm.ip += target;
             }
         } break;
-        case OP_RET: {
-            goto vm_loop_done;
-        }
 
         /* Stack manipulation */
         case OP_CONSTANTW: {
@@ -153,15 +155,14 @@ u32 run(Bytecode bytecode)
         } break;
         case OP_LDBPW: {
             BytecodeImm bp_offset = nexti(&vm);
-            pushw(&vm, loadw(&vm, vm.bp + bp_offset));
+            pushw(&vm, ldw(&vm, vm.bp + bp_offset));
         } break;
         case OP_STBPW: {
             BytecodeImm bp_offset = nexti(&vm);
             BytecodeWord value = popw(&vm);
-            storew(&vm, vm.bp + bp_offset, value);
+            stw(&vm, vm.bp + bp_offset, value);
         } break;
 
-        /* Higher-level language support */
         case OP_PRINT: {
             u8 n_args = next_u8(&vm);
             /* Must first pop unto an array to maintain correct printing order */
@@ -175,6 +176,24 @@ u32 run(Bytecode bytecode)
             }
             printf("\n");
         } break;
+        case OP_FUNCPRO:
+            pushw(&vm, vm.bp);
+            vm.bp = (BytecodeWord)vm.sp - stack_start;
+            break;
+        case OP_RET:
+            vm.sp = (u8 *)(vm.bp + stack_start);
+            vm.bp = popw(&vm);
+            vm.ip = (u8 *)popw(&vm);
+            break;
+        case OP_CALL: {
+            BytecodeWord callee_offset = popw(&vm);
+            pushw(&vm, (BytecodeWord)vm.ip);
+            vm.ip = bytecode.code + callee_offset;
+        } break;
+
+        case OP_EXIT:
+            goto vm_loop_done;
+            break;
 
         default:
             printf("Unknown opcode %d\n", instruction);

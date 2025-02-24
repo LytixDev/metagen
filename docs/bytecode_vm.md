@@ -9,29 +9,17 @@ Goals:
 
 ## Bytecode:
 
-DOING RIGHTNOW:
+Layout:
+- Setup of global variables
+- Main function
+- Every other function
+
+Todo:
+- Args
 - Struct member padding
 - Struct member access (load and store)
-- Bytecode compiler tracks bp-relative position of each variable in scope
-- call, funcpro, ret, bp-relative stack loads/store instructions
+- Global variables
 
-
-var glob: s32
-
-func main(): s32
-begin   
-    var i: s32
-    i := 0
-    glob := 10
-    while i < 10
-    begin
-        var j: s32
-        var k: s32
-        k := i
-        i := i + 1
-    end
-    print glob
-end
 
 
 ## VM:

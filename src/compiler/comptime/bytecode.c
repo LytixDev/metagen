@@ -24,9 +24,9 @@
 #include <stdio.h>
 
 char *op_code_str_map[OP_TYPE_LEN] = {
-    "ADDW", "SUBW", "MULW", "DIVW",  "LSHIFT",    "RSHIFT",  "GE",    "LE",
-    "NOT",  "JMP",  "BIZ",  "BNZ",   "CONSTANTW", "PUSHNW",  "POPNW", "LDBPW",
-    "STBPW", "LDAW",  "STAW",  "PRINT", "CALL",      "FUNCPRO", "RET",
+    "ADDW",  "SUBW", "MULW", "DIVW",  "LSHIFT",    "RSHIFT",  "GE",    "LE",
+    "NOT",   "JMP",  "BIZ",  "BNZ",   "CONSTANTW", "PUSHNW",  "POPNW", "LDBPW",
+    "STBPW", "LDAW", "STAW", "PRINT", "CALL",      "FUNCPRO", "RET",   "EXIT",
 };
 
 
@@ -143,6 +143,11 @@ static void patchi(Bytecode *b, u32 offset, BytecodeImm value)
     *(BytecodeImm *)(b->code + offset) = value;
 }
 
+static s64 bytes_to_words(s64 bytes)
+{
+    return (bytes + sizeof(BytecodeWord) - 1) / sizeof(BytecodeWord);
+}
+
 static StackVars *make_stack_vars(StackVars *parent)
 {
     StackVars *locals = malloc(sizeof(StackVars));
@@ -203,11 +208,32 @@ static void stack_vars_print(StackVars *s)
     }
 }
 
+static void func_register_start(BytecodeCompiler *bc, Str8 func_name)
+{
+    /* We add +1 to the code_offset so 0x0 is not treated as the NULL pointer */
+    hashmap_put(&bc->functions, func_name.str, func_name.len,
+                (void *)(size_t)(bc->bytecode.code_offset + 1), sizeof(void *), false);
+}
+
+static u32 func_get_start(BytecodeCompiler *bc, Str8 func_name)
+{
+    void *bytecode_offset = hashmap_get(&bc->functions, func_name.str, func_name.len);
+    if (bytecode_offset == NULL) {
+        /* Function not generated yet, needs to be patched later */
+        PatchCall p = (PatchCall){ .offset = bc->bytecode.code_offset, .func_name = func_name };
+        bc->patches[bc->calls_to_patch++] = p;
+        return 0;
+    }
+
+    return (u32)((size_t)bytecode_offset) - 1;
+}
+
 static void bytecode_compiler_init(BytecodeCompiler *bc, SymbolTable symt_root)
 {
     bc->bytecode.code_offset = 0;
     bc->symt_root = symt_root;
     bc->flags = BCF_LOAD_IDENT;
+    bc->calls_to_patch = 0;
     hashmap_init(&bc->globals);
     hashmap_init(&bc->functions);
 }
@@ -236,7 +262,7 @@ static BytecodeImm new_stack_vars_from_block(BytecodeCompiler *bc, SymbolTable *
         }
     }
     s64 bp_added_offset = bc->bp_stack_offset - bp_offset_pre;
-    s64 var_space_in_words = (bp_added_offset + sizeof(BytecodeWord) - 1) / sizeof(BytecodeWord);
+    s64 var_space_in_words = bytes_to_words(bp_added_offset);
     // TODO: if var_space_in_words not addressable by s64, error
     return (BytecodeImm)var_space_in_words;
 }
@@ -251,19 +277,20 @@ static void ast_expr_access_struct_member(BytecodeCompiler *bc, AstBinary *expr)
     AstLiteral *struct_lit = (AstLiteral *)expr->left;
     AstLiteral *struct_member = (AstLiteral *)expr->right;
     TypeInfoStruct *struct_type = (TypeInfoStruct *)struct_lit->type;
-    
+
     s64 member_offset = -1;
     for (u32 i = 0; i < struct_type->members_len; i++) {
         TypeInfoStructMember *member = struct_type->members[i];
-        if (STR8VIEW_EQUAL(member->name, struct_member->sym->name)) {
+        if (STR8_EQUAL(member->name, struct_member->sym->name)) {
             member_offset = member->offset;
         }
     }
     assert(member_offset != -1);
 
     BytecodeImm bp_offset = stack_vars_get(bc, struct_lit->sym->name);
-    bp_offset += member_offset / 8; 
-    write_instruction(&bc->bytecode, bc->flags == BCF_STORE_IDENT ? OP_STBPW : OP_LDBPW, debug_line);
+    bp_offset += member_offset / 8;
+    write_instruction(&bc->bytecode, bc->flags == BCF_STORE_IDENT ? OP_STBPW : OP_LDBPW,
+                      debug_line);
     writei(&bc->bytecode, bp_offset);
 }
 
@@ -273,6 +300,45 @@ static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
     default:
         printf("Ast expr not handled\n");
         break;
+    case EXPR_CALL: {
+        AstCall *call = AS_CALL(head);
+        Symbol *callee = get_sym_by_name(&bc->symt_root, call->identifier);
+        TypeInfoFunc *callee_type = (TypeInfoFunc *)callee->type_info;
+
+        s64 arg_space_bytes = 0;
+        for (u32 i = 0; i < callee_type->n_params; i++) {
+            TypeInfo *param_type = callee_type->param_types[i];
+            arg_space_bytes += type_info_byte_size(param_type);
+        }
+        BytecodeWord arg_space_words = bytes_to_words(arg_space_bytes);
+        BytecodeWord return_type_space = bytes_to_words(type_info_byte_size(call->type));
+
+        /* Make stack space for return value */
+        write_instruction(&bc->bytecode, OP_PUSHNW, debug_line);
+        writei(&bc->bytecode, return_type_space);
+
+        /* Push args */
+        if (call->args) {
+            for (AstListNode *n = call->args->head; n != NULL; n = n->next) {
+                ast_expr_to_bytecode(bc, (AstExpr *)n->this);
+                // write_instruction(&bc->bytecode, OP_STBPW, debug_line);
+                // Str8 arg_name = callee_type->param_names[arg_i];
+                // writei(&bc->bytecode, stack_vars_get(bc, expr->sym->name));
+            }
+        }
+
+        /* Push return address */
+        write_instruction(&bc->bytecode, OP_CONSTANTW, debug_line);
+        writew(&bc->bytecode, (BytecodeWord)func_get_start(bc, call->identifier));
+
+        /* Call */
+        write_instruction(&bc->bytecode, OP_CALL, debug_line);
+
+        /* Reclaim stack space */
+        // NOTE/TODO: we never reclaim the return value as we expect it to be used in an assignment
+        write_instruction(&bc->bytecode, OP_POPNW, debug_line);
+        writei(&bc->bytecode, arg_space_words);
+    } break;
     case EXPR_BINARY: {
         AstBinary *expr = AS_BINARY(head);
         // NOTE: we only support integers right now
@@ -382,7 +448,6 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *bc, AstStmt *head)
                bc->bytecode.code_offset - end_target - sizeof(BytecodeImm));
     } break;
     case STMT_BLOCK: {
-        // TODO: use proper BP offset !
         AstBlock *block = AS_BLOCK(head);
         bool new_vars = block->symt_local->sym_len > 0;
         BytecodeImm var_space_in_words = 0;
@@ -417,16 +482,26 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *bc, AstStmt *head)
         write_instruction(&bc->bytecode, OP_PRINT, head->line);
         write_instruction(&bc->bytecode, n_args, head->line);
     } break;
+    case STMT_RETURN: {
+        // NOTE: right we force returns to have values, later we may want to change this
+        AstSingle *stmt = AS_SINGLE(head);
+        ast_expr_to_bytecode(bc, (AstExpr *)stmt->node);
+        /* Now, the return value is on the stack. We need to store it in the retun value slot. */
+        BytecodeImm return_slot_offset = stack_vars_get(bc, return_var_internal_name);
+        write_instruction(&bc->bytecode, OP_STBPW, debug_line);
+        writei(&bc->bytecode, return_slot_offset);
+    } break;
     }
 }
 
-void ast_func_to_bytecode(BytecodeCompiler *bc, AstFunc *func)
+void ast_func_to_bytecode(BytecodeCompiler *bc, AstFunc *func, bool is_main)
 {
     assert(func->body != NULL);
     Symbol *sym = get_sym_by_name(&bc->symt_root, func->name);
     assert(sym != NULL && sym->kind == SYMBOL_FUNC && sym->type_info != NULL);
-    TypeInfoFunc *func_type = (TypeInfoFunc *)sym->type_info;
 
+    func_register_start(bc, func->name);
+    TypeInfoFunc *func_type = (TypeInfoFunc *)sym->type_info;
     bc->stack_vars = make_stack_vars(NULL);
     bc->bp_stack_offset = 0;
 
@@ -437,13 +512,18 @@ void ast_func_to_bytecode(BytecodeCompiler *bc, AstFunc *func)
         Symbol *param = params.symbols[i];
         params_space += type_info_byte_size(param->type_info);
     }
-    s64 stack_space_before_bp = sizeof(BytecodeWord); // Return address
+    s64 stack_space_before_bp = sizeof(BytecodeWord) * 2; // Return address and call address
     // NOTE: If we allow optional return types later we must handle this here as well
-    stack_space_before_bp += params_space + type_info_byte_size(func_type->return_type);
+    stack_space_before_bp +=
+        params_space +
+        bytes_to_words(type_info_byte_size(func_type->return_type)) * sizeof(BytecodeWord);
     // TODO: error if stack_space_before_bp must be addressable by a s16
 
-    /* Determine bp-relative offset of return value and arguments */
-    s64 current_bp_offset = -stack_space_before_bp;
+    /*
+     * Determine bp-relative offset of return value and arguments
+     */
+    s64 current_bp_offset =
+        -stack_space_before_bp; // - type_info_byte_size(func_type->return_type);
     stack_vars_set(bc->stack_vars, return_var_internal_name, current_bp_offset);
     current_bp_offset += type_info_byte_size(func_type->return_type);
     for (u32 i = 0; i < params.sym_len; i++) {
@@ -453,10 +533,16 @@ void ast_func_to_bytecode(BytecodeCompiler *bc, AstFunc *func)
     }
     // stack_vars_print(bc->stack_vars);
 
+    /* Function prologue instruction : push bp, set bp = sp */
+    write_instruction(&bc->bytecode, OP_FUNCPRO, (s64)-1);
     ast_stmt_to_bytecode(bc, func->body);
 
     /* Function epilogue */
-    write_instruction(&bc->bytecode, OP_RET, (s64)-1);
+    if (is_main) {
+        write_instruction(&bc->bytecode, OP_EXIT, (s64)-1);
+    } else {
+        write_instruction(&bc->bytecode, OP_RET, (s64)-1);
+    }
 
     free_all_stack_vars(bc->stack_vars);
     bc->stack_vars = NULL;
@@ -466,15 +552,35 @@ Bytecode ast_to_bytecode(SymbolTable symt_root, AstRoot *root)
 {
     assert(root->funcs.head != NULL);
     return_var_internal_name = STR8_LIT("__RETURN__VAR__");
-    BytecodeCompiler compiler;
-    bytecode_compiler_init(&compiler, symt_root);
+    BytecodeCompiler bytecode_compiler;
+    bytecode_compiler_init(&bytecode_compiler, symt_root);
 
     /* TODO: Make space for global varibales */
 
-    for (AstListNode *node = root->funcs.head; node != NULL; node = node->next) {
-        ast_func_to_bytecode(&compiler, AS_FUNC(node->this));
+    /* Generate main function */
+    if (root->main_function == NULL) {
+        fprintf(stderr, "no main function, panic!"); // TODO: better error handling
+    } else {
+        // NOTE: right now we assume the main function takes no arguments
+        ast_func_to_bytecode(&bytecode_compiler, root->main_function, true);
     }
 
-    bytecode_compiler_free(&compiler);
-    return compiler.bytecode;
+    /* Generate all other functions */
+    for (AstListNode *node = root->funcs.head; node != NULL; node = node->next) {
+        AstFunc *func = AS_FUNC(node->this);
+        if (!STR8_EQUAL(func->name, STR8_LIT("main"))) {
+            ast_func_to_bytecode(&bytecode_compiler, func, false);
+        }
+    }
+
+    /* Patch calls */
+    for (u32 i = 0; i < bytecode_compiler.calls_to_patch; i++) {
+        PatchCall patch = bytecode_compiler.patches[i];
+        u32 actual = func_get_start(&bytecode_compiler, patch.func_name);
+        patchw(&bytecode_compiler.bytecode, patch.offset, (BytecodeWord)actual);
+    }
+
+
+    bytecode_compiler_free(&bytecode_compiler);
+    return bytecode_compiler.bytecode;
 }

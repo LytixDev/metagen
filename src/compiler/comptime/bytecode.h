@@ -68,8 +68,9 @@ typedef enum {
 
     OP_PRINT,
     OP_CALL, // TODO
-    OP_FUNCPRO, // TODO
+    OP_FUNCPRO, // push bp, set bp = sp
     OP_RET, // TODO
+    OP_EXIT, // Halt the execution
 
     OP_TYPE_LEN,
 } OpCode;
@@ -108,6 +109,11 @@ typedef enum {
 } BytecodeCompilerFlags;
 
 typedef struct {
+    u32 offset;
+    Str8 func_name;
+} PatchCall;
+
+typedef struct {
     SymbolTable symt_root;
     Bytecode bytecode;
 
@@ -116,7 +122,8 @@ typedef struct {
 
     HashMap globals; // Key: Symbol name, Value: Absolute position in the stack
     HashMap functions; // Key: Symbol name, Value: Absolute position of first instruction in code
-
+    PatchCall patches[100];
+    u32 calls_to_patch;
     BytecodeCompilerFlags flags;
 } BytecodeCompiler;
 

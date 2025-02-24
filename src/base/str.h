@@ -64,6 +64,7 @@ typedef Str8 Str8View;
     }
 #define STR8VIEW_EQUAL(a, b) \
     ((a).len == (b).len && ((a).len == 0 || memcmp((a).str, (b).str, (a).len) == 0))
+#define STR8_EQUAL(a, b) (STR8VIEW_EQUAL((a), (b)))
 
 #define STR8_LIT(literal)                    \
     (Str8)                                   \

@@ -230,8 +230,9 @@ typedef struct {
 
 typedef struct {
     AstNodeKind kind;
+    AstFunc *main_function; // @NULLABLE
     AstList vars; // AstTypedVarList wrapped inside
-    AstList funcs; // AstFunc
+    AstList funcs; // AstFunc, includes the main function, if it exists
     AstList structs; // AstStruct
     AstList enums; // AstEnum
     AstList calls; // AstCall - Compile time calls

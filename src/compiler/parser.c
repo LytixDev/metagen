@@ -599,7 +599,16 @@ static AstRoot *parse_root(Parser *parser)
         }
     }
 
-    return make_root(parser->arena, vars, funcs, structs, enums, calls);
+    AstRoot *root = make_root(parser->arena, vars, funcs, structs, enums, calls);
+    /* Set the main function */
+    for (AstListNode *node = root->funcs.head; node != NULL; node = node->next) {
+        AstFunc *func = AS_FUNC(node->this);
+        if (STR8_EQUAL(func->name, STR8_LIT("main"))) {
+            root->main_function = func;
+            break;
+        }
+    }
+    return root;
 }
 
 AstRoot *parse(Arena *arena, Arena *lex_arena, ErrorHandler *e, char *input)
