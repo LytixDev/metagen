@@ -159,6 +159,9 @@ u32 run(Bytecode bytecode)
         } break;
         case OP_STBPW: {
             BytecodeImm bp_offset = nexti(&vm);
+            if (bp_offset == -28) {
+                vm.ip += 0;
+            }
             BytecodeWord value = popw(&vm);
             stw(&vm, vm.bp + bp_offset, value);
         } break;

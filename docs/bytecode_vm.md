@@ -6,20 +6,21 @@ Goals:
 - Simplicity
 - Easy to extend
 - Interop with compiler internals
+- Move most of the complexity to the bytecode generator.
 
 ## Bytecode:
 
+
 Layout:
-- Setup of global variables
+- Setup code for global variables
 - Main function
 - Every other function
 
-Todo:
-- Args
-- Struct member padding
+Bytecode generator todo:
+- Fix passing args to function calls
+- Struct member padding ?
 - Struct member access (load and store)
 - Global variables
-
 
 
 ## VM:
@@ -56,14 +57,3 @@ Callee:
 - Restore stack pointer by setting it to the base pointer (deallocates space on the stack used by the function)
 - Pop old base pointer
 - Pop return address as PC
-
-
-
-
-TODO:
-- Global variables
-- Entrypoint and OP_EXIT
-- Support functions
-- Dynamic stack
-
-

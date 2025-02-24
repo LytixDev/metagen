@@ -305,12 +305,11 @@ static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
         Symbol *callee = get_sym_by_name(&bc->symt_root, call->identifier);
         TypeInfoFunc *callee_type = (TypeInfoFunc *)callee->type_info;
 
-        s64 arg_space_bytes = 0;
+        s64 arg_space_words = 0;
         for (u32 i = 0; i < callee_type->n_params; i++) {
             TypeInfo *param_type = callee_type->param_types[i];
-            arg_space_bytes += type_info_byte_size(param_type);
+            arg_space_words += bytes_to_words(type_info_byte_size(param_type));
         }
-        BytecodeWord arg_space_words = bytes_to_words(arg_space_bytes);
         BytecodeWord return_type_space = bytes_to_words(type_info_byte_size(call->type));
 
         /* Make stack space for return value */
@@ -321,9 +320,6 @@ static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
         if (call->args) {
             for (AstListNode *n = call->args->head; n != NULL; n = n->next) {
                 ast_expr_to_bytecode(bc, (AstExpr *)n->this);
-                // write_instruction(&bc->bytecode, OP_STBPW, debug_line);
-                // Str8 arg_name = callee_type->param_names[arg_i];
-                // writei(&bc->bytecode, stack_vars_get(bc, expr->sym->name));
             }
         }
 
@@ -522,8 +518,7 @@ void ast_func_to_bytecode(BytecodeCompiler *bc, AstFunc *func, bool is_main)
     /*
      * Determine bp-relative offset of return value and arguments
      */
-    s64 current_bp_offset =
-        -stack_space_before_bp; // - type_info_byte_size(func_type->return_type);
+    s64 current_bp_offset = -stack_space_before_bp;
     stack_vars_set(bc->stack_vars, return_var_internal_name, current_bp_offset);
     current_bp_offset += type_info_byte_size(func_type->return_type);
     for (u32 i = 0; i < params.sym_len; i++) {
