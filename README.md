@@ -71,9 +71,9 @@ struct User {
 ### Language Features
 | Feature | Frontend | C backend | Bytecode backend |
 |----------|----------|----------|----------|
-| If else | ✅ | ✅ | ⏳ |
+| If else | ✅ | ✅ | ✅  |
 | Switch | ❌ | ❌ | ❌ |
-| While loops | ✅ | ✅ | ⏳ |
+| While loops | ✅ | ✅ | ✅ |
 | For loops | ❌ | ❌ | ❌ |
 | Foreach loops | ❌ | ❌ | ❌ |
 | Structs | ✅ | ⏳ | ❌ |
@@ -84,7 +84,7 @@ struct User {
 | Functions | ✅ | ✅ | ⏳ |
 | Ints & Floats | ⏳ | ❌ | ❌ |
 | Booleans | ❌ | ❌ | ❌ |
-| Arithmetic | ⏳ | ⏳ | ⏳ |
+| Arithmetic | ✅  | ✅  | ✅  |
 
 misc:
 - more comparison operators (>, >=)
