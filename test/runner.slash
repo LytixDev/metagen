@@ -2,7 +2,9 @@
 
 var files = (find "cases/" -type f)
 var successes = 0
-var tests = (echo $files | wc -l)
+var tests = (echo $files | wc -l) as num
+
+var failed_tests = []
 
 loop file in $files {
     printf '\033[94mCheck %s:\033[0m\n' $file
@@ -54,12 +56,22 @@ loop file in $files {
     if $failed == false {
         $successes += 1
         printf '\033[92mSucceeded\033[0m\n\n'
+    } else {
+        $failed_tests += [$file]
     }
     
     # Remove temporary files
     rm $tree_file $tree_actual_file $output_file $output_actual_file $output_actual_bytecode_file
 }
 
+echo "-- Summary -- "
 echo $successes "out of" $tests "tests succeeded"
+
+if $successes != $tests {
+    echo "Failed:"
+    loop failed_test in $failed_tests {
+        echo $failed_test
+    }
+}
 
 rm out.c a.out

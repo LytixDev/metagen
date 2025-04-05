@@ -355,6 +355,12 @@ static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
         case TOKEN_MINUS:
             write_instruction(&bc->bytecode, OP_SUBW, debug_line);
             break;
+        case TOKEN_STAR:
+            write_instruction(&bc->bytecode, OP_MULW, debug_line);
+            break;
+        case TOKEN_SLASH:
+            write_instruction(&bc->bytecode, OP_DIVW, debug_line);
+            break;
         case TOKEN_EQ:
             write_instruction(&bc->bytecode, OP_SUBW, debug_line);
             write_instruction(&bc->bytecode, OP_NOT, debug_line);
