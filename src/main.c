@@ -101,7 +101,7 @@ u32 compile(char *file_name, Str8 source)
     if (options.bytecode_backend && options.run_bytecode) {
         LOG_DEBUG_NOARG("Generating bytecode");
         Bytecode bytecode = ast_to_bytecode(compiler.symt_root, ast_root);
-        disassemble(bytecode, source);
+        //disassemble(bytecode, source);
         run(bytecode);
     } else {
         LOG_DEBUG_NOARG("Generating c-code");

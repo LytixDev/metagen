@@ -1,0 +1,83 @@
+--- SOURCE ---
+func main(): s32
+begin   
+    var i: s32
+    i := 42
+
+    if i = 42 then
+        print 1
+    else
+        print 0
+
+    if i = 0 then
+        print 1
+    else if i = 42 then
+        print 2
+    else
+        print 3
+
+    if i = 0 then
+        print 1
+    else if i = 1 then
+        print 2
+    else
+        print 3
+end
+--- TREE ---
+AST_ROOT
+ AST_LIST
+ AST_LIST
+  AST_FUNC name=main parameters=
+   STMT_BLOCK vars=i: s32
+    AST_LIST
+     STMT_ASSIGNMENT
+      EXPR_LITERAL i
+      EXPR_LITERAL 42
+     STMT_IF
+      EXPR_BINARY
+       op: EQ
+       EXPR_LITERAL i
+       EXPR_LITERAL 42
+      STMT_PRINT
+       EXPR_LITERAL 1
+      STMT_PRINT
+       EXPR_LITERAL 0
+     STMT_IF
+      EXPR_BINARY
+       op: EQ
+       EXPR_LITERAL i
+       EXPR_LITERAL 0
+      STMT_PRINT
+       EXPR_LITERAL 1
+      STMT_IF
+       EXPR_BINARY
+        op: EQ
+        EXPR_LITERAL i
+        EXPR_LITERAL 42
+       STMT_PRINT
+        EXPR_LITERAL 2
+       STMT_PRINT
+        EXPR_LITERAL 3
+     STMT_IF
+      EXPR_BINARY
+       op: EQ
+       EXPR_LITERAL i
+       EXPR_LITERAL 0
+      STMT_PRINT
+       EXPR_LITERAL 1
+      STMT_IF
+       EXPR_BINARY
+        op: EQ
+        EXPR_LITERAL i
+        EXPR_LITERAL 1
+       STMT_PRINT
+        EXPR_LITERAL 2
+       STMT_PRINT
+        EXPR_LITERAL 3
+ AST_LIST
+ AST_LIST
+ AST_LIST
+--- OUTPUT ---
+1
+2
+3

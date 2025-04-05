@@ -194,7 +194,7 @@ static void gen_expr(Compiler *compiler, AstExpr *head)
             fprintf(f, "[");
             gen_expr(compiler, expr->right);
             fprintf(f, "]");
-            fprintf(f, ")");
+            //fprintf(f, ")");
             break;
         }
         gen_expr(compiler, expr->left);
@@ -306,10 +306,10 @@ static void gen_stmt(Compiler *compiler, AstStmt *head, u32 indent)
         fprintf(f, "}");
     } break;
     case STMT_BREAK:
-        fprintf(f, "break");
+        fprintf(f, "break;");
         break;
     case STMT_CONTINUE:
-        fprintf(f, "continue");
+        fprintf(f, "continue;");
         break;
     case STMT_RETURN: {
         AstSingle *stmt = AS_SINGLE(head);

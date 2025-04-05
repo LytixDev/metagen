@@ -282,7 +282,8 @@ void ast_print_stmt(AstStmt *head, u32 indent)
         putchar('\n');
     }
     print_indent(indent);
-    printf("%s@%zu", node_kind_str_map[head->kind], head->line);
+    //printf("%s@%zu", node_kind_str_map[head->kind], head->line);
+    printf("%s", node_kind_str_map[head->kind]);
     switch (head->kind) {
     case STMT_WHILE: {
         AstWhile *stmt = AS_WHILE(head);
