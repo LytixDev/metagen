@@ -41,6 +41,6 @@ typedef struct {
 } MetagenVM;
 
 
-u32 run(Bytecode b);
+u32 run(Bytecode bytecode, bool debug);
 
 #endif /* VM_H */

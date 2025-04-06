@@ -81,7 +81,7 @@ struct User {
 | Strings | ✅ | ❌ | ❌ |
 | Arrays | ✅ | ✅ | ❌ |
 | Slices | ❌ | ❌ | ❌ |
-| Functions | ✅ | ✅ | ⏳ |
+| Functions | ✅ | ✅ | ✅   |
 | Ints & Floats | ⏳ | ❌ | ❌ |
 | Booleans | ❌ | ❌ | ❌ |
 | Arithmetic | ✅  | ✅  | ✅  |

@@ -80,24 +80,23 @@ static void stw(MetagenVM *vm, BytecodeWord byte_offset, BytecodeWord value)
 
 static void dump_stack(MetagenVM vm, OpCode instruction)
 {
-    printf("Step %zu : %s\n", vm.instructions_executed - 1, op_code_str_map[instruction]);
+    printf("Step %zu : %s, bp : %zu (%zu)\n", vm.instructions_executed - 1, op_code_str_map[instruction], vm.bp, vm.bp / 8);
     for (s32 i = 0; i < (vm.sp - vm.ss); i++) {
-        printf("%02x ", vm.stack[i]);
+        // printf("%02x ", vm.stack[i]);
         if ((i + 1) % 8 == 0) {
-            // TODO: each 8 byte sequenec as an s64 and as two s32s
             u8 *chunk = &vm.stack[i - 7]; // Start of this 8-byte block
             s64 as_s64 = *(s64 *)chunk;
             s32 low = *(s32 *)chunk;
             s32 high = *(s32 *)(chunk + 4);
-            printf(" | s64: %lld | s32s: %d, %d", (long long)as_s64, low, high);
+            //printf(" | s64: %lld | s32s: %d, %d", (long long)as_s64, low, high);
+            printf("%d: %lld", i / 8, (long long)as_s64);
             printf("\n");
-            //printf("\n");
         }
     }
     printf("\n");
 }
 
-u32 run(Bytecode bytecode)
+u32 run(Bytecode bytecode, bool debug)
 {
     MetagenVM vm = {0};
     vm.b = bytecode;
@@ -223,7 +222,10 @@ u32 run(Bytecode bytecode)
             goto vm_loop_done;
         }
 
-        // dump_stack(vm, instruction);
+
+        if (debug) {
+            dump_stack(vm, instruction);
+        }
     }
 
 vm_loop_done:

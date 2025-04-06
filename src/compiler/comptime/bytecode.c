@@ -524,6 +524,7 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *bc, AstStmt *head)
         BytecodeImm return_slot_offset = stack_vars_get(bc, return_var_internal_name);
         write_instruction(&bc->bytecode, OP_STBPW, debug_line);
         writei(&bc->bytecode, return_slot_offset);
+        write_instruction(&bc->bytecode, OP_RET, (s64)-1);
     } break;
     }
 }
@@ -539,19 +540,21 @@ void ast_func_to_bytecode(BytecodeCompiler *bc, AstFunc *func, bool is_main)
     bc->stack_vars = make_stack_vars(NULL);
     bc->bp_stack_offset = 0;
 
-    /* Determine the amount of stack space between return value and bp */
+    // NOTE: "Temporary" stack alignment, see new_stack_vars_from_block()
+
+    /* Space for function parameters */
     s64 params_space = 0;
     SymbolTable params = sym->symt_local;
     for (u32 i = 0; i < params.sym_len; i++) {
         Symbol *param = params.symbols[i];
         params_space += type_info_byte_size(param->type_info);
+        params_space = (s64)align_forward(params_space, sizeof(BytecodeWord));
     }
-    s64 stack_space_before_bp = sizeof(BytecodeWord) * 2; // Return address and call address
-    // NOTE: If we allow optional return types later we must handle this here as well
-    stack_space_before_bp +=
-        params_space +
-        bytes_to_words(type_info_byte_size(func_type->return_type)) * sizeof(BytecodeWord);
-    // TODO: error if stack_space_before_bp must be addressable by a s16
+    // *2 because space for return address and the old bp itself
+    s64 stack_space_before_bp = sizeof(BytecodeWord) * 2;
+    stack_space_before_bp += params_space;
+    stack_space_before_bp += bytes_to_words(type_info_byte_size(func_type->return_type));
+    stack_space_before_bp = (s64)align_forward(stack_space_before_bp, sizeof(BytecodeWord));
 
     /*
      * Determine bp-relative offset of return value and arguments
@@ -559,12 +562,14 @@ void ast_func_to_bytecode(BytecodeCompiler *bc, AstFunc *func, bool is_main)
     s64 current_bp_offset = -stack_space_before_bp;
     stack_vars_set(bc->stack_vars, return_var_internal_name, current_bp_offset);
     current_bp_offset += type_info_byte_size(func_type->return_type);
+    current_bp_offset = (s64)align_forward(current_bp_offset, sizeof(BytecodeWord));
     for (u32 i = 0; i < params.sym_len; i++) {
         Symbol *param = params.symbols[i];
         stack_vars_set(bc->stack_vars, param->name, current_bp_offset);
         current_bp_offset += type_info_byte_size(param->type_info);
+        current_bp_offset = (s64)align_forward(current_bp_offset, sizeof(BytecodeWord));
     }
-    // stack_vars_print(bc->stack_vars);
+    //stack_vars_print(bc->stack_vars);
 
     /* Function prologue instruction : push bp, set bp = sp */
     write_instruction(&bc->bytecode, OP_FUNCPRO, (s64)-1);

@@ -40,6 +40,7 @@ typedef struct {
     bool parse_only; /* Stops after parsing and prints the syntax tree */
     bool bytecode_backend; /* Emits bytecode instead of the default C backend */
     bool run_bytecode; /* Treat the input as bytecode and run it */
+    bool debug_bytecode; /* Bytecode backend goes into debug mode */
 } MetagenOptions;
 
 MetagenOptions options = { 0 };
@@ -101,8 +102,11 @@ u32 compile(char *file_name, Str8 source)
     if (options.bytecode_backend && options.run_bytecode) {
         LOG_DEBUG_NOARG("Generating bytecode");
         Bytecode bytecode = ast_to_bytecode(compiler.symt_root, ast_root);
-        // disassemble(bytecode, source);
-        run(bytecode);
+        if (options.debug_bytecode) {
+            disassemble(bytecode, source);
+        }
+        //run(bytecode, options.debug_bytecode);
+        run(bytecode, false);
     } else {
         LOG_DEBUG_NOARG("Generating c-code");
         transpile_to_c(&compiler);
@@ -135,9 +139,10 @@ int main(int argc, char *argv[])
      * -b           Emits bytecode instead of the default C backend.
      * -r           Treat the input as bytecode and run it. If used with -b then it runs the
      *              bytecode directly.
+     * -d           Debug bytecode.
      */
     int opt;
-    while ((opt = getopt(argc, argv, "l:pbr")) != -1) {
+    while ((opt = getopt(argc, argv, "l:pbrd")) != -1) {
         switch (opt) {
         case 'l': {
             int log_level = atoi(optarg);
@@ -155,6 +160,9 @@ int main(int argc, char *argv[])
             break;
         case 'r':
             options.run_bytecode = true;
+            break;
+        case 'd':
+            options.debug_bytecode = true;
             break;
         case '?':
             fprintf(stderr, "Error: Bad usage.\n");
