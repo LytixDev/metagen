@@ -78,21 +78,44 @@ static void stw(MetagenVM *vm, BytecodeWord byte_offset, BytecodeWord value)
     *(BytecodeWord *)(vm->stack + byte_offset) = value;
 }
 
+static void dump_stack(MetagenVM vm, OpCode instruction)
+{
+    printf("Step %zu : %s\n", vm.instructions_executed - 1, op_code_str_map[instruction]);
+    for (s32 i = 0; i < (vm.sp - vm.ss); i++) {
+        printf("%02x ", vm.stack[i]);
+        if ((i + 1) % 8 == 0) {
+            // TODO: each 8 byte sequenec as an s64 and as two s32s
+            u8 *chunk = &vm.stack[i - 7]; // Start of this 8-byte block
+            s64 as_s64 = *(s64 *)chunk;
+            s32 low = *(s32 *)chunk;
+            s32 high = *(s32 *)(chunk + 4);
+            printf(" | s64: %lld | s32s: %d, %d", (long long)as_s64, low, high);
+            printf("\n");
+            //printf("\n");
+        }
+    }
+    printf("\n");
+}
+
 u32 run(Bytecode bytecode)
 {
-    MetagenVM vm;
+    MetagenVM vm = {0};
     vm.b = bytecode;
     vm.ip = bytecode.code;
     vm.sp = (u8 *)vm.stack;
+    vm.ss = vm.sp;
     vm.bp = 0;
+    vm.instructions_executed = 0;
     // vm.flags = 0;
 
     BytecodeWord stack_start = (BytecodeWord)vm.sp;
-
     while (1) {
+        vm.instructions_executed++;
+
         // printf("ip:%d sp:%d, bp:%d %s\n", vm.ip - bytecode.code, vm.sp - stack_start, vm.bp,
         // op_code_str_map[*vm.ip]);
         OpCode instruction;
+
         switch (instruction = *vm.ip++) {
         /* Arithmetic */
         case OP_ADDW:
@@ -159,9 +182,6 @@ u32 run(Bytecode bytecode)
         } break;
         case OP_STBPW: {
             BytecodeImm bp_offset = nexti(&vm);
-            if (bp_offset == -28) {
-                vm.ip += 0;
-            }
             BytecodeWord value = popw(&vm);
             stw(&vm, vm.bp + bp_offset, value);
         } break;
@@ -202,6 +222,8 @@ u32 run(Bytecode bytecode)
             printf("Unknown opcode %d\n", instruction);
             goto vm_loop_done;
         }
+
+        // dump_stack(vm, instruction);
     }
 
 vm_loop_done:

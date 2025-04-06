@@ -32,9 +32,12 @@ typedef struct {
 
     u8 stack[STACK_MAX * 8]; // Byte-addressable stack
     u8 *sp;
+    u8 *ss; // stack start
     BytecodeWord bp; // Base pointer as an index / offset
 
     VMFlags flags;
+
+    size_t instructions_executed;
 } MetagenVM;
 
 

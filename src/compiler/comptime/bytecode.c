@@ -35,6 +35,21 @@ s64 lines_written = -1;
 Str8 return_var_internal_name;
 
 
+static uintptr_t align_forward(uintptr_t ptr, size_t align)
+{
+    // assert(is_power_of_two(align));
+
+    uintptr_t p = ptr;
+    uintptr_t a = (uintptr_t)align;
+    uintptr_t modulo = p & (a - 1);
+
+    if (modulo != 0) {
+        p += a - modulo;
+    }
+
+    return p;
+}
+
 /* Bytecode dissasembler */
 static void disassemble_instruction(Bytecode *b, Str8List source_lines)
 {
@@ -259,6 +274,17 @@ static BytecodeImm new_stack_vars_from_block(BytecodeCompiler *bc, SymbolTable *
         if (sym->kind == SYMBOL_LOCAL_VAR) {
             stack_vars_set(bc->stack_vars, sym->name, bc->bp_stack_offset);
             bc->bp_stack_offset += type_info_byte_size(sym->type_info);
+
+            /*
+             * NOTE:
+             * The Bytecode compiler aligns every local stack variable to sizeof(BytecodeWord) 
+             * boundary (8 bytes). This results in easy codegen but is quite wasteful. 
+             * Possible improvents is to try to group local variables so they naturally align, for 
+             * instance storing two s32's next to eachother. Then when loading, we have two load 
+             * the entire word (64 bits) and emit mask and shift instructions to obtain the s32 we
+             * want.
+             */
+            bc->bp_stack_offset = (s64)align_forward(bc->bp_stack_offset, sizeof(BytecodeWord));
         }
     }
     s64 bp_added_offset = bc->bp_stack_offset - bp_offset_pre;
