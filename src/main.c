@@ -109,7 +109,7 @@ u32 compile(char *file_name, Str8 source)
             AstCall *call = AS_CALL(node->this);
 
             Bytecode bytecode = ast_call_to_bytecode(compiler.symt_root, ast_root, call);
-            // disassemble(bytecode, source);
+            disassemble(bytecode, source);
             BytecodeWord result = run(bytecode, false);
 
             Str8Builder sb = make_str_builder(compiler.persist_arena);

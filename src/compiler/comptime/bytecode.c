@@ -608,9 +608,19 @@ Bytecode ast_call_to_bytecode(SymbolTable symt_root, AstRoot *root, AstCall *cal
     BytecodeCompiler bytecode_compiler;
     bytecode_compiler_init(&bytecode_compiler, symt_root);
 
+
     AstExpr *expr = (AstExpr *)call->args->head->this;
     ast_expr_to_bytecode(&bytecode_compiler, expr);
     write_instruction(&bytecode_compiler.bytecode, OP_EXIT, (s64)-1);
+
+    // TODO: Figure out minimum set of functions necessary
+    /* Generate all functions */
+    for (AstListNode *node = root->funcs.head; node != NULL; node = node->next) {
+        AstFunc *func = AS_FUNC(node->this);
+        if (!STR8_EQUAL(func->name, STR8_LIT("main"))) {
+            ast_func_to_bytecode(&bytecode_compiler, func, false);
+        }
+    }
 
     /* Patch calls */
     for (u32 i = 0; i < bytecode_compiler.calls_to_patch; i++) {
