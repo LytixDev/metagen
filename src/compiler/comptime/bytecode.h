@@ -46,8 +46,8 @@ typedef enum {
     OP_SUBW,
     OP_MULW,
     OP_DIVW,
-    OP_LSHIFT,
-    OP_RSHIFT,
+    OP_LSHIFTW,
+    OP_RSHIFTW,
     OP_GE, // pop a and pop b. Push 1 if a >= b
     OP_LE, // pop a and pop b. Push 1 if a <= b
     OP_NOT,

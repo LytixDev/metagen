@@ -24,7 +24,7 @@
 #include <stdio.h>
 
 char *op_code_str_map[OP_TYPE_LEN] = {
-    "ADDW",  "SUBW", "MULW", "DIVW",  "LSHIFT",    "RSHIFT",  "GE",    "LE",
+    "ADDW",  "SUBW", "MULW", "DIVW",  "LSHIFTW",    "RSHIFTW",  "GE",    "LE",
     "NOT",   "JMP",  "BIZ",  "BNZ",   "CONSTANTW", "PUSHNW",  "POPNW", "LDBPW",
     "STBPW", "LDAW", "STAW", "PRINT", "CALL",      "FUNCPRO", "RET",   "EXIT",
 };
@@ -386,6 +386,12 @@ static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
             break;
         case TOKEN_SLASH:
             write_instruction(&bc->bytecode, OP_DIVW, debug_line);
+            break;
+        case TOKEN_LSHIFT:
+            write_instruction(&bc->bytecode, OP_LSHIFTW, debug_line);
+            break;
+        case TOKEN_RSHIFT:
+            write_instruction(&bc->bytecode, OP_RSHIFTW, debug_line);
             break;
         case TOKEN_EQ:
             write_instruction(&bc->bytecode, OP_SUBW, debug_line);

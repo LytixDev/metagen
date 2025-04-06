@@ -130,10 +130,10 @@ u32 run(Bytecode bytecode)
         case OP_DIVW:
             pushw(&vm, popw(&vm) / popw(&vm));
             break;
-        case OP_LSHIFT:
+        case OP_LSHIFTW:
             pushw(&vm, popw(&vm) << popw(&vm));
             break;
-        case OP_RSHIFT:
+        case OP_RSHIFTW:
             pushw(&vm, popw(&vm) >> popw(&vm));
             break;
         case OP_GE:

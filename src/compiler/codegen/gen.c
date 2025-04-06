@@ -159,6 +159,10 @@ static void gen_global(Compiler *compiler, Symbol *sym)
 
 static void gen_expr(Compiler *compiler, AstExpr *head)
 {
+    if (head->kind == EXPR_BINARY) {
+        fprintf(f, "(");
+    }
+
     switch (head->kind) {
     case EXPR_UNARY: {
         AstUnary *expr = AS_UNARY(head);
@@ -194,7 +198,6 @@ static void gen_expr(Compiler *compiler, AstExpr *head)
             fprintf(f, "[");
             gen_expr(compiler, expr->right);
             fprintf(f, "]");
-            //fprintf(f, ")");
             break;
         }
         gen_expr(compiler, expr->left);
@@ -274,6 +277,10 @@ static void gen_expr(Compiler *compiler, AstExpr *head)
     } break;
     default:
         ASSERT_NOT_REACHED;
+    }
+
+    if (head->kind == EXPR_BINARY) {
+        fprintf(f, ")");
     }
 }
 
