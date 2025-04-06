@@ -96,7 +96,7 @@ static void dump_stack(MetagenVM vm, OpCode instruction)
     printf("\n");
 }
 
-u32 run(Bytecode bytecode, bool debug)
+BytecodeWord run(Bytecode bytecode, bool debug)
 {
     MetagenVM vm = {0};
     vm.b = bytecode;
@@ -228,8 +228,9 @@ u32 run(Bytecode bytecode, bool debug)
         }
     }
 
+BytecodeWord final;
+
 vm_loop_done:
-    // final = stack_pop(&vm);
-    // printf("%d\n", final);
-    return 0;
+    final = popw(&vm);
+    return final;
 }

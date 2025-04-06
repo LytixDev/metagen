@@ -128,7 +128,8 @@ typedef struct {
 } BytecodeCompiler;
 
 
-Bytecode ast_to_bytecode(SymbolTable symt_root, AstRoot *root);
+Bytecode ast_call_to_bytecode(SymbolTable symt_root, AstRoot *root, AstCall *call);
+Bytecode ast_root_to_bytecode(SymbolTable symt_root, AstRoot *root);
 void disassemble(Bytecode b, Str8 source);
 
 Bytecode fib_test(void);

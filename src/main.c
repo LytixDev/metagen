@@ -15,6 +15,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include <getopt.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <sys/stat.h>
 
@@ -87,21 +88,56 @@ u32 compile(char *file_name, Str8 source)
         goto done;
     }
 
-    /* Middle end */
     if (run_compiler_pass(&compiler, ast_root, typegen, "typegen")) {
         goto done;
     }
-    if (run_compiler_pass(&compiler, ast_root, infer, "type infer")) {
-        goto done;
-    }
-    if (run_compiler_pass(&compiler, ast_root, typecheck, "typecheck")) {
-        goto done;
-    }
+
+    bool had_to_resolve = false;
+    do {
+        /* Middle end */
+        if (run_compiler_pass(&compiler, ast_root, infer, "type infer")) {
+            goto done;
+        }
+        if (run_compiler_pass(&compiler, ast_root, typecheck, "typecheck")) {
+            goto done;
+        }
+
+        /* Find unresolved comptile time calls */
+        for (AstListNode *node = ast_root->comptime_calls.head; node != NULL; node = node->next) {
+            //had_to_resolve = true;
+
+            AstCall *call = AS_CALL(node->this);
+
+            Bytecode bytecode = ast_call_to_bytecode(compiler.symt_root, ast_root, call);
+            // disassemble(bytecode, source);
+            BytecodeWord result = run(bytecode, false);
+
+            Str8Builder sb = make_str_builder(compiler.persist_arena);
+            str_builder_sprintf(&sb, "%d", 1, result);
+            str_builder_end(&sb, true);
+
+            AstLiteral literal;
+            literal.kind = EXPR_LITERAL;
+            literal.lit_type = LIT_NUM;
+            literal.literal = sb.str;
+
+            call->is_resolved = true;
+            call->resolved_node = (AstNode *)&literal;
+
+            // wrap result in literal node
+            // set type of literal node based on compile time function
+            // update the old call
+            // go back to middle end
+        }
+
+        // TEMPORARY
+        // ast_root->comptime_calls.head = NULL;
+    } while (had_to_resolve);
 
     /* Backend */
     if (options.bytecode_backend && options.run_bytecode) {
         LOG_DEBUG_NOARG("Generating bytecode");
-        Bytecode bytecode = ast_to_bytecode(compiler.symt_root, ast_root);
+        Bytecode bytecode = ast_root_to_bytecode(compiler.symt_root, ast_root);
         if (options.debug_bytecode) {
             disassemble(bytecode, source);
         }

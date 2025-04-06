@@ -73,6 +73,10 @@ static AstList *parse_expr_list(Parser *parser);
 static AstStmt *parse_stmt(Parser *parser);
 static TypedIdentList parse_local_decl_list(Parser *parser);
 
+
+
+AstList comptime_calls = { .kind = AST_LIST, .head = NULL, .tail = NULL };
+
 static Token next_token(Parser *parser)
 {
     if (parser->unlex) {
@@ -234,6 +238,21 @@ static AstExpr *parse_primary(Parser *parser)
     case TOKEN_MINUS: {
         AstExpr *expr = parse_expr(parser, 0);
         return (AstExpr *)make_unary(parser->arena, expr, token.kind);
+    }
+    case TOKEN_AT: {
+        Token identifier = next_token(parser);
+        if (identifier.kind != TOKEN_IDENTIFIER) {
+            error_parse(parser->lexer.e, "Expected a function identifier", identifier);
+        }
+        Token next = peek_token(parser);
+        if (next.kind != TOKEN_LPAREN) {
+            error_parse(parser->lexer.e, "Expected a compile time function call", next);
+        }
+
+        AstCall *call = parse_call(parser, identifier, true);
+        AstListNode *call_node = make_list_node(parser->arena, (AstNode *)call);
+        ast_list_push_back(&comptime_calls, call_node);
+        return (AstExpr *)call;
     }
     case TOKEN_NUM:
     case TOKEN_IDENTIFIER: {
@@ -546,7 +565,6 @@ static AstRoot *parse_root(Parser *parser)
     AstList funcs = { .kind = AST_LIST, .head = NULL, .tail = NULL };
     AstList structs = { .kind = AST_LIST, .head = NULL, .tail = NULL };
     AstList enums = { .kind = AST_LIST, .head = NULL, .tail = NULL };
-    AstList calls = { .kind = AST_LIST, .head = NULL, .tail = NULL };
 
     Token next;
     while ((next = next_token(parser)).kind != TOKEN_EOF) {
@@ -590,7 +608,7 @@ static AstRoot *parse_root(Parser *parser)
                 consume_or_err(parser, TOKEN_IDENTIFIER, "Expected an function name after '@'");
             AstCall *call = parse_call(parser, function_identifier, true);
             AstListNode *call_node = make_list_node(parser->arena, (AstNode *)call);
-            ast_list_push_back(&calls, call_node);
+            ast_list_push_back(&comptime_calls, call_node);
         }; break;
         default: {
             error_parse(parser->lexer.e, "Illegal first token. Expected var, struct or func", next);
@@ -599,7 +617,7 @@ static AstRoot *parse_root(Parser *parser)
         }
     }
 
-    AstRoot *root = make_root(parser->arena, vars, funcs, structs, enums, calls);
+    AstRoot *root = make_root(parser->arena, vars, funcs, structs, enums, comptime_calls);
     /* Set the main function */
     for (AstListNode *node = root->funcs.head; node != NULL; node = node->next) {
         AstFunc *func = AS_FUNC(node->this);

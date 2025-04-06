@@ -67,10 +67,11 @@ AstLiteral *make_literal(Arena *a, Token token)
 AstCall *make_call(Arena *a, bool is_comptime, Str8View identifier, AstList *args)
 {
     AstCall *call = m_arena_alloc(a, sizeof(AstCall));
-    call->is_comptime = is_comptime;
     call->kind = EXPR_CALL;
     call->identifier = identifier;
     call->args = args;
+    call->is_comptime = is_comptime;
+    call->is_resolved = false;
     return call;
 }
 
@@ -202,7 +203,7 @@ AstRoot *make_root(Arena *a, AstList vars, AstList funcs, AstList structs, AstLi
     root->funcs = funcs;
     root->structs = structs;
     root->enums = enums;
-    root->calls = calls;
+    root->comptime_calls = calls;
     return root;
 }
 
@@ -352,7 +353,7 @@ void ast_print(AstNode *head, u32 indent)
         ast_print((AstNode *)(&root->funcs), indent + 1);
         ast_print((AstNode *)(&root->structs), indent + 1);
         ast_print((AstNode *)(&root->enums), indent + 1);
-        ast_print((AstNode *)(&root->calls), indent + 1);
+        ast_print((AstNode *)(&root->comptime_calls), indent + 1);
     }; break;
     case AST_FUNC: {
         AstFunc *func = AS_FUNC(head);

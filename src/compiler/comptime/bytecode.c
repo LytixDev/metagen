@@ -328,6 +328,10 @@ static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
         break;
     case EXPR_CALL: {
         AstCall *call = AS_CALL(head);
+        if (call->is_resolved) {
+            ast_expr_to_bytecode(bc, (AstExpr *)call->resolved_node);
+            break;
+        }
         Symbol *callee = get_sym_by_name(&bc->symt_root, call->identifier);
         TypeInfoFunc *callee_type = (TypeInfoFunc *)callee->type_info;
 
@@ -535,8 +539,12 @@ void ast_func_to_bytecode(BytecodeCompiler *bc, AstFunc *func, bool is_main)
     Symbol *sym = get_sym_by_name(&bc->symt_root, func->name);
     assert(sym != NULL && sym->kind == SYMBOL_FUNC && sym->type_info != NULL);
 
-    func_register_start(bc, func->name);
     TypeInfoFunc *func_type = (TypeInfoFunc *)sym->type_info;
+    if (func_type->is_comptime) {
+        return;
+    }
+
+    func_register_start(bc, func->name);
     bc->stack_vars = make_stack_vars(NULL);
     bc->bp_stack_offset = 0;
 
@@ -586,7 +594,36 @@ void ast_func_to_bytecode(BytecodeCompiler *bc, AstFunc *func, bool is_main)
     bc->stack_vars = NULL;
 }
 
-Bytecode ast_to_bytecode(SymbolTable symt_root, AstRoot *root)
+
+Bytecode ast_call_to_bytecode(SymbolTable symt_root, AstRoot *root, AstCall *call)
+{
+    // NOTE: hardcoded for @eval() case
+
+    // Figure out which functions we need to generate
+    // Generate all relevant functions
+
+    // Assume comptime call is eval, so hardcode it to call the first parameter
+    // of the call
+
+    BytecodeCompiler bytecode_compiler;
+    bytecode_compiler_init(&bytecode_compiler, symt_root);
+
+    AstExpr *expr = (AstExpr *)call->args->head->this;
+    ast_expr_to_bytecode(&bytecode_compiler, expr);
+    write_instruction(&bytecode_compiler.bytecode, OP_EXIT, (s64)-1);
+
+    /* Patch calls */
+    for (u32 i = 0; i < bytecode_compiler.calls_to_patch; i++) {
+        PatchCall patch = bytecode_compiler.patches[i];
+        u32 actual = func_get_start(&bytecode_compiler, patch.func_name);
+        patchw(&bytecode_compiler.bytecode, patch.offset, (BytecodeWord)actual);
+    }
+
+    bytecode_compiler_free(&bytecode_compiler);
+    return bytecode_compiler.bytecode;
+}
+
+Bytecode ast_root_to_bytecode(SymbolTable symt_root, AstRoot *root)
 {
     assert(root->funcs.head != NULL);
     return_var_internal_name = STR8_LIT("__RETURN__VAR__");

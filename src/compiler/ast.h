@@ -143,10 +143,19 @@ typedef struct {
 
 typedef struct {
     AstExprKind kind;
-    bool is_comptime;
     TypeInfo *type; // @NULLABLE. Only set after typechecking.
     Str8 identifier;
     AstList *args; // @NULLABLE.
+
+    bool is_comptime;
+    bool is_resolved;
+    AstNode *resolved_node; // @NULLABLE. Points to the newly created node at comptime.
+    /*
+     * NOTE: Current solution sees comptime calls pointing to the noede that replaces it after 
+     *       being resolved. A better(?) solution would be that to directly replace this node,
+     *       meaning all nodes that point to the old comptime call node would just point to the 
+     *       new node. Makes sense?
+     */
 } AstCall;
 
 /* Statements */
@@ -235,7 +244,7 @@ typedef struct {
     AstList funcs; // AstFunc, includes the main function, if it exists
     AstList structs; // AstStruct
     AstList enums; // AstEnum
-    AstList calls; // AstCall - Compile time calls
+    AstList comptime_calls; // AstCall, pointers to compile time calls.
 } AstRoot;
 
 
