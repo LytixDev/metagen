@@ -249,9 +249,9 @@ typedef struct {
 
 
 #define AST_IS_EXPR(___node) \
-    (IS_BETWEEN((___node)->kind, (AstNodeKind)EXPR_UNARY, (AstNodeKind)EXPR_TYPE_LEN - 1))
+    (IS_BETWEEN((AstNodeKind)((___node)->kind), (AstNodeKind)EXPR_UNARY, (AstNodeKind)EXPR_TYPE_LEN - 1))
 #define AST_IS_STMT(___node) \
-    (IS_BETWEEN((___node)->kind, (AstNodeKind)STMT_WHILE, (AstNodeKind)STMT_TYPE_LEN - 1))
+    (IS_BETWEEN((AstNodeKind)((___node)->kind), (AstNodeKind)STMT_WHILE, (AstNodeKind)STMT_TYPE_LEN - 1))
 
 #define AS_UNARY(___expr) ((AstUnary *)(___expr))
 #define AS_BINARY(___expr) ((AstBinary *)(___expr))

@@ -349,7 +349,11 @@ static void bind_expr(Compiler *c, SymbolTable *symt_local, AstExpr *head)
     case EXPR_CALL: {
         AstCall *call = AS_CALL(head);
         if (call->is_resolved) {
-            bind_stmt(c, symt_local, (AstStmt *)call->resolved_node);
+            if (AST_IS_STMT(call)) {
+                bind_stmt(c, symt_local, (AstStmt *)call->resolved_node);
+            } else {
+                bind_expr(c, symt_local, (AstExpr *)call->resolved_node);
+            }
         }
 
         if (call->args == NULL) {
@@ -803,10 +807,9 @@ static void resolve_global_types(Compiler *c)
     }
 }
 
-void typegen(Compiler *c, AstRoot *root)
+static void typegen_init(Compiler *c)
 {
     c->symt_root = symt_init(NULL);
-
     /* Fill symbol table with builtin types */
     fill_builtin_types(c);
     /* Fill symbol table with compiler intrinsic functions */
@@ -820,6 +823,11 @@ void typegen(Compiler *c, AstRoot *root)
     tz->info.is_resolved = true;
     tz->pointer_to = NULL;
     c->sym_null = symt_new_sym(c, &c->symt_root, SYMBOL_NULL_PTR, name, (TypeInfo *)tz, NULL);
+}
+
+void typegen(Compiler *c, AstRoot *root)
+{
+    typegen_init(c);
 
     /* Create symbols and types for global declarations */
     for (AstListNode *node = root->enums.head; node != NULL; node = node->next) {

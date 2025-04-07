@@ -109,3 +109,8 @@ This may actually be quite intricate as the dependency graph can get tricky.
     - What if a compile time function calls another function, which uses global state?
 
 - What if a compile time function makes an OS specific call?
+
+- For the bytecode VM, how does it figure out what to return back to the compiler after a compile time call?
+
+- How can we reuse as much information as possible between typegen and type infer passes? 
+    - Incremental typegen, infer, and typecheck

@@ -88,13 +88,20 @@ u32 compile(char *file_name, Str8 source)
         goto done;
     }
 
-    if (run_compiler_pass(&compiler, ast_root, typegen, "typegen")) {
-        goto done;
-    }
 
-    bool had_to_resolve = false;
+    /*
+     * TODO: Right now we redo the middle in its entirety after compile time calls .
+     *       This is wasteful as most things remain the same. It also current leaks memory.
+     *       We want to do some kind of incremental typegen, infer and typecheck.
+     */
+    bool had_to_resolve;
     do {
+        had_to_resolve = false;
+
         /* Middle end */
+        if (run_compiler_pass(&compiler, ast_root, typegen, "typegen")) {
+            goto done;
+        }
         if (run_compiler_pass(&compiler, ast_root, infer, "type infer")) {
             goto done;
         }
@@ -103,35 +110,33 @@ u32 compile(char *file_name, Str8 source)
         }
 
         /* Find unresolved comptile time calls */
+        // TODO: Figure out order
         for (AstListNode *node = ast_root->comptime_calls.head; node != NULL; node = node->next) {
-            //had_to_resolve = true;
+            had_to_resolve = true;
 
             AstCall *call = AS_CALL(node->this);
 
             Bytecode bytecode = ast_call_to_bytecode(compiler.symt_root, ast_root, call);
-            disassemble(bytecode, source);
+            // disassemble(bytecode, source);
             BytecodeWord result = run(bytecode, false);
-
+            // TODO: Temporary assume result is an s32, turn it into a source literal
             Str8Builder sb = make_str_builder(compiler.persist_arena);
             str_builder_sprintf(&sb, "%d", 1, result);
             str_builder_end(&sb, true);
 
-            AstLiteral literal;
-            literal.kind = EXPR_LITERAL;
-            literal.lit_type = LIT_NUM;
-            literal.literal = sb.str;
+            // TODO: Figure out how to wrap properly
+            AstLiteral *literal = m_arena_alloc(compiler.persist_arena, sizeof(AstLiteral));
+            literal->kind = EXPR_LITERAL;
+            literal->lit_type = LIT_NUM;
+            literal->literal = sb.str;
 
             call->is_resolved = true;
-            call->resolved_node = (AstNode *)&literal;
-
-            // wrap result in literal node
-            // set type of literal node based on compile time function
-            // update the old call
-            // go back to middle end
+            call->resolved_node = (AstNode *)literal;
         }
 
         // TEMPORARY
-        // ast_root->comptime_calls.head = NULL;
+        ast_root->comptime_calls.head = NULL;
+
     } while (had_to_resolve);
 
     /* Backend */
