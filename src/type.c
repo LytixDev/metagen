@@ -14,21 +14,16 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#include "type.h"
-#include "ast.h"
-#include "base/base.h"
-#include "base/nag.h"
-#include "base/nicc.h"
-#include "base/sac_single.h"
-#include "base/str.h"
-#include "compiler.h"
-#include "error.h"
-
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "ast.h"
+#include "base.h"
+#include "compiler.h"
+#include "error.h"
 
 
 TypeInfo type_unresolved_comptime_call = { .kind = TYPE_UNRESOLVED_COMPTIME_CALL };
@@ -730,7 +725,6 @@ static void fill_builtin_types(Compiler *c)
 }
 
 
-
 static void typegen_from_intrinsic_func(Compiler *c, Str8 func_name)
 {
     TypeInfoFunc *t = make_type_info(c->persist_arena, TYPE_FUNC, func_name);
@@ -742,7 +736,7 @@ static void typegen_from_intrinsic_func(Compiler *c, Str8 func_name)
     t->return_type = &type_unresolved_comptime_call;
     symt_new_sym(c, &c->symt_root, SYMBOL_FUNC, func_name, (TypeInfo *)t, NULL);
 
-    // TODO: Typegen will be tricky here  
+    // TODO: Typegen will be tricky here
     //       What is the type of eval() for instance ?
 
 

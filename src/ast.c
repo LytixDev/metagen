@@ -15,7 +15,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "ast.h"
-#include "base/str.h"
+#include "base.h"
 #include "lex.h"
 #include "type.h"
 #include <stdio.h>
@@ -283,7 +283,7 @@ void ast_print_stmt(AstStmt *head, u32 indent)
         putchar('\n');
     }
     print_indent(indent);
-    //printf("%s@%zu", node_kind_str_map[head->kind], head->line);
+    // printf("%s@%zu", node_kind_str_map[head->kind], head->line);
     printf("%s", node_kind_str_map[head->kind]);
     switch (head->kind) {
     case STMT_WHILE: {

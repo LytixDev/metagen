@@ -18,10 +18,9 @@
 #define BYTECODE_H
 
 
-#include "base/nicc.h"
-#include "base/types.h"
-#include "compiler/ast.h"
-#include "compiler/type.h"
+#include "ast.h"
+#include "base.h"
+#include "type.h"
 
 typedef s64 BytecodeWord;
 typedef s16 BytecodeImm; // Value immeditely preceeding certain instructions

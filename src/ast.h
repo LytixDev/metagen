@@ -17,8 +17,7 @@
 #ifndef AST_H
 #define AST_H
 
-#include "base/base.h"
-#include "base/types.h"
+#include "base.h"
 #include "lex.h"
 
 typedef struct symbol_t Symbol; // forward from type.h
@@ -151,9 +150,9 @@ typedef struct {
     bool is_resolved;
     AstNode *resolved_node; // @NULLABLE. Points to the newly created node at comptime.
     /*
-     * NOTE: Current solution sees comptime calls pointing to the noede that replaces it after 
+     * NOTE: Current solution sees comptime calls pointing to the noede that replaces it after
      *       being resolved. A better(?) solution would be that to directly replace this node,
-     *       meaning all nodes that point to the old comptime call node would just point to the 
+     *       meaning all nodes that point to the old comptime call node would just point to the
      *       new node. Makes sense?
      */
 } AstCall;
@@ -248,10 +247,12 @@ typedef struct {
 } AstRoot;
 
 
-#define AST_IS_EXPR(___node) \
-    (IS_BETWEEN((AstNodeKind)((___node)->kind), (AstNodeKind)EXPR_UNARY, (AstNodeKind)EXPR_TYPE_LEN - 1))
-#define AST_IS_STMT(___node) \
-    (IS_BETWEEN((AstNodeKind)((___node)->kind), (AstNodeKind)STMT_WHILE, (AstNodeKind)STMT_TYPE_LEN - 1))
+#define AST_IS_EXPR(___node)                                             \
+    (IS_BETWEEN((AstNodeKind)((___node)->kind), (AstNodeKind)EXPR_UNARY, \
+                (AstNodeKind)EXPR_TYPE_LEN - 1))
+#define AST_IS_STMT(___node)                                             \
+    (IS_BETWEEN((AstNodeKind)((___node)->kind), (AstNodeKind)STMT_WHILE, \
+                (AstNodeKind)STMT_TYPE_LEN - 1))
 
 #define AS_UNARY(___expr) ((AstUnary *)(___expr))
 #define AS_BINARY(___expr) ((AstBinary *)(___expr))

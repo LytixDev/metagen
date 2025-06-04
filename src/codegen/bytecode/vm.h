@@ -17,7 +17,7 @@
 #ifndef VM_H
 #define VM_H
 
-#include "compiler/comptime/bytecode.h"
+#include "codegen/bytecode/gen.h"
 
 #define STACK_MAX 1024
 

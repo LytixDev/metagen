@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2024 Nicolai Brand (https://lytix.dev)
+ *  Copyright (C) 2024-2025 Nicolai Brand (https://lytix.dev)
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -14,26 +14,11 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef COMPILER_H
-#define COMPILER_H
+#ifndef GEN_H
+#define GEN_H
 
-#include "base/nicc.h"
-#include "base/sac_single.h"
-#include "type.h"
+#include "compiler.h"
 
-typedef struct error_handler_t ErrorHandler; // forward decl from error.h
+void transpile_to_c(Compiler *compiler);
 
-
-typedef struct compiler_t {
-    Arena *pass_arena; // Temporary data which only persist for the duration of a single pass.
-    Arena *persist_arena;
-    ErrorHandler *e;
-
-    SymbolTable symt_root;
-    Symbol *sym_null; // The null pointer constant
-
-    ArrayList all_types; // Holds TypeInfo **. Every base type lives here.
-    ArrayList struct_types; // Holds TypeInfoStruct **
-} Compiler;
-
-#endif /* COMPILER_H */
+#endif /* TYPE_H */

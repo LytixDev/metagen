@@ -17,8 +17,7 @@
 #ifndef LEX_H
 #define LEX_H
 
-#include "base/str.h"
-#include "base/types.h"
+#include "base.h"
 
 typedef struct error_handler_t ErrorHandler; // forward decl from error.h
 

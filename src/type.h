@@ -18,7 +18,7 @@
 #define TYPE_H
 
 #include "ast.h"
-#include "base/nicc.h"
+#include "base.h"
 
 typedef struct compiler_t Compiler; // forward decl from compiler.h
 

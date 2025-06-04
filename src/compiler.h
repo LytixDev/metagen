@@ -14,12 +14,25 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef GEN_H
-#define GEN_H
+#ifndef COMPILER_H
+#define COMPILER_H
 
-#include "compiler/compiler.h"
-#include "compiler/type.h"
+#include "base.h"
+#include "type.h"
 
-void transpile_to_c(Compiler *compiler);
+typedef struct error_handler_t ErrorHandler; // forward decl from error.h
 
-#endif /* TYPE_H */
+
+typedef struct compiler_t {
+    Arena *pass_arena; // Temporary data which only persist for the duration of a single pass.
+    Arena *persist_arena;
+    ErrorHandler *e;
+
+    SymbolTable symt_root;
+    Symbol *sym_null; // The null pointer constant
+
+    ArrayList all_types; // Holds TypeInfo **. Every base type lives here.
+    ArrayList struct_types; // Holds TypeInfoStruct **
+} Compiler;
+
+#endif /* COMPILER_H */

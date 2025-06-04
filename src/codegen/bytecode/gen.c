@@ -14,17 +14,17 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#include "compiler/comptime/bytecode.h"
-#include "base/str.h"
-#include "base/types.h"
-#include "compiler/ast.h"
-#include "compiler/type.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "ast.h"
+#include "base.h"
+#include "codegen/bytecode/gen.h"
+#include "type.h"
+
 char *op_code_str_map[OP_TYPE_LEN] = {
-    "ADDW",  "SUBW", "MULW", "DIVW",  "LSHIFTW",    "RSHIFTW",  "GE",    "LE",
+    "ADDW",  "SUBW", "MULW", "DIVW",  "LSHIFTW",   "RSHIFTW", "GE",    "LE",
     "NOT",   "JMP",  "BIZ",  "BNZ",   "CONSTANTW", "PUSHNW",  "POPNW", "LDBPW",
     "STBPW", "LDAW", "STAW", "PRINT", "CALL",      "FUNCPRO", "RET",   "EXIT",
 };
@@ -277,10 +277,10 @@ static BytecodeImm new_stack_vars_from_block(BytecodeCompiler *bc, SymbolTable *
 
             /*
              * NOTE:
-             * The Bytecode compiler aligns every local stack variable to sizeof(BytecodeWord) 
-             * boundary (8 bytes). This results in easy codegen but is quite wasteful. 
-             * Possible improvents is to try to group local variables so they naturally align, for 
-             * instance storing two s32's next to eachother. Then when loading, we have two load 
+             * The Bytecode compiler aligns every local stack variable to sizeof(BytecodeWord)
+             * boundary (8 bytes). This results in easy codegen but is quite wasteful.
+             * Possible improvents is to try to group local variables so they naturally align, for
+             * instance storing two s32's next to eachother. Then when loading, we have two load
              * the entire word (64 bits) and emit mask and shift instructions to obtain the s32 we
              * want.
              */
@@ -577,7 +577,7 @@ void ast_func_to_bytecode(BytecodeCompiler *bc, AstFunc *func, bool is_main)
         current_bp_offset += type_info_byte_size(param->type_info);
         current_bp_offset = (s64)align_forward(current_bp_offset, sizeof(BytecodeWord));
     }
-    //stack_vars_print(bc->stack_vars);
+    // stack_vars_print(bc->stack_vars);
 
     /* Function prologue instruction : push bp, set bp = sp */
     write_instruction(&bc->bytecode, OP_FUNCPRO, (s64)-1);

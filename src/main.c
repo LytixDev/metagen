@@ -19,21 +19,17 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
-#include "compiler/ast.h"
-#include "compiler/codegen/gen.h"
-#include "compiler/compiler.h"
-#include "compiler/comptime/bytecode.h"
-#include "compiler/comptime/vm.h"
-#include "compiler/error.h"
-#include "compiler/parser.h"
-#include "compiler/type.h"
+#define BASE_IMPLEMENTATION
+#include "base.h"
 
-#include "base/log.h"
-#include "base/str.h"
-#define NICC_IMPLEMENTATION
-#include "base/nicc.h"
-#define SAC_IMPLEMENTATION
-#include "base/sac_single.h"
+#include "ast.h"
+#include "codegen/bytecode/gen.h"
+#include "codegen/bytecode/vm.h"
+#include "codegen/c/gen.h"
+#include "compiler.h"
+#include "error.h"
+#include "parser.h"
+#include "type.h"
 
 
 typedef struct {
@@ -146,7 +142,7 @@ u32 compile(char *file_name, Str8 source)
         if (options.debug_bytecode) {
             disassemble(bytecode, source);
         }
-        //run(bytecode, options.debug_bytecode);
+        // run(bytecode, options.debug_bytecode);
         run(bytecode, false);
     } else {
         LOG_DEBUG_NOARG("Generating c-code");

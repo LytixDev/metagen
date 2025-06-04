@@ -14,8 +14,8 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#include "compiler/comptime/vm.h"
-#include "compiler/comptime/bytecode.h"
+#include "codegen/bytecode/vm.h"
+#include "codegen/bytecode/gen.h"
 #include <assert.h>
 #include <stdio.h>
 
@@ -80,7 +80,8 @@ static void stw(MetagenVM *vm, BytecodeWord byte_offset, BytecodeWord value)
 
 static void dump_stack(MetagenVM vm, OpCode instruction)
 {
-    printf("Step %zu : %s, bp : %zu (%zu)\n", vm.instructions_executed - 1, op_code_str_map[instruction], vm.bp, vm.bp / 8);
+    printf("Step %zu : %s, bp : %zu (%zu)\n", vm.instructions_executed - 1,
+           op_code_str_map[instruction], vm.bp, vm.bp / 8);
     for (s32 i = 0; i < (vm.sp - vm.ss); i++) {
         // printf("%02x ", vm.stack[i]);
         if ((i + 1) % 8 == 0) {
@@ -88,7 +89,7 @@ static void dump_stack(MetagenVM vm, OpCode instruction)
             s64 as_s64 = *(s64 *)chunk;
             s32 low = *(s32 *)chunk;
             s32 high = *(s32 *)(chunk + 4);
-            //printf(" | s64: %lld | s32s: %d, %d", (long long)as_s64, low, high);
+            // printf(" | s64: %lld | s32s: %d, %d", (long long)as_s64, low, high);
             printf("%d: %lld", i / 8, (long long)as_s64);
             printf("\n");
         }
@@ -98,7 +99,7 @@ static void dump_stack(MetagenVM vm, OpCode instruction)
 
 BytecodeWord run(Bytecode bytecode, bool debug)
 {
-    MetagenVM vm = {0};
+    MetagenVM vm = { 0 };
     vm.b = bytecode;
     vm.ip = bytecode.code;
     vm.sp = (u8 *)vm.stack;
@@ -228,7 +229,7 @@ BytecodeWord run(Bytecode bytecode, bool debug)
         }
     }
 
-BytecodeWord final;
+    BytecodeWord final;
 
 vm_loop_done:
     final = popw(&vm);

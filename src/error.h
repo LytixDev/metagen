@@ -18,8 +18,7 @@
 #define ERROR_H
 
 #include "ast.h"
-#include "base/sac_single.h"
-#include "base/str.h"
+#include "base.h"
 #include "lex.h"
 #include "type.h"
 
