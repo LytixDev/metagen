@@ -254,6 +254,11 @@ typedef struct {
     (IS_BETWEEN((AstNodeKind)((___node)->kind), (AstNodeKind)STMT_WHILE, \
                 (AstNodeKind)STMT_TYPE_LEN - 1))
 
+
+#define AS_NODE(___node) ((AstNode *)(___node))
+#define AS_EXPR(___node) ((AstExpr *)(___node))
+#define AS_STMT(___node) ((AstStmt *)(___node))
+
 #define AS_UNARY(___expr) ((AstUnary *)(___expr))
 #define AS_BINARY(___expr) ((AstBinary *)(___expr))
 #define AS_LITERAL(___expr) ((AstLiteral *)(___expr))
@@ -298,7 +303,7 @@ AstTypedIdentList *make_typed_ident_list(Arena *a, TypedIdentList vars);
 AstRoot *make_root(Arena *a, AstList vars, AstList funcs, AstList structs, AstList enums,
                    AstList calls);
 
-void ast_print(AstNode *head, u32 indent);
+void ast_to_str(Str8Builder *sb, AstRoot *root);
 
 
 #endif /* AST_H */

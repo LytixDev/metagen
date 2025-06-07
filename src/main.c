@@ -83,11 +83,13 @@ u32 compile(char *file_name, Str8 source)
         goto done;
     }
     if (options.parse_only) {
-        ast_print((AstNode *)ast_root, 0);
-        putchar('\n');
+        ArenaTmp tmp_arena = m_arena_tmp_init(compiler.persist_arena);
+        Str8Builder sb = make_str_builder(tmp_arena.arena);
+        ast_to_str(&sb, ast_root);
+        printf("%s\n", sb.str.str);
+        m_arena_tmp_release(tmp_arena);
         goto done;
     }
-
 
     /*
      * TODO: Right now we redo the middle in its entirety after compile time calls .

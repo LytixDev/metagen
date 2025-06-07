@@ -208,194 +208,188 @@ AstRoot *make_root(Arena *a, AstList vars, AstList funcs, AstList structs, AstLi
 }
 
 /* AST Print */
-static void print_indent(u32 indent)
+// TODO:
+// AstRoot *ast_from_str(Str8 *dump)
+static void print_indent(Str8Builder *sb, u32 indent)
 {
     for (u32 i = 0; i < indent; i++) {
-        putchar(' ');
+        str_builder_append_u8(sb, ' ');
     }
 }
 
-static void ast_print_typed_var_list(TypedIdentList vars)
+static void ast_print_typed_var_list(Str8Builder *sb, TypedIdentList vars)
 {
     for (u32 i = 0; i < vars.len; i++) {
         TypedIdent var = vars.vars[i];
-        printf("%.*s: ", STR8VIEW_PRINT(var.name));
+        str_builder_append_str8(sb, var.name);
+        str_builder_append_u8(sb, ':');
+        str_builder_append_u8(sb, ' ');
         for (s32 j = 0; j < var.ast_type_info.pointer_indirection; j++) {
-            printf("^");
+            str_builder_append_u8(sb, '^');
         }
-        printf("%.*s", STR8VIEW_PRINT(var.ast_type_info.name));
-        if (var.ast_type_info.is_array) {
-            printf("[%d]", var.ast_type_info.elements);
-        }
+        // TODO: create AstTypeInfo to str func
+        str_builder_append_str8(sb, var.ast_type_info.name);
         if (i != vars.len - 1) {
-            printf(", ");
+            str_builder_append_str8(sb, STR8_LIT(", "));
         }
     }
 }
 
-static void ast_print_expr(AstExpr *head, u32 indent)
+static void ast_node_to_str(Str8Builder *sb, AstNode *head, u32 indent)
 {
-    putchar('\n');
-    print_indent(indent);
-    printf("%s ", node_kind_str_map[head->kind]);
-
-    switch (head->kind) {
-    case EXPR_UNARY: {
-        AstUnary *unary = AS_UNARY(head);
-        char *op_text_repr = token_type_str_map[unary->op];
-        printf("%s", op_text_repr);
-        ast_print_expr(unary->expr, indent + 1);
-    } break;
-    case EXPR_BINARY: {
-        AstBinary *binary = AS_BINARY(head);
-        char *op_text_repr = token_type_str_map[binary->op];
-        putchar('\n');
-        print_indent(indent + 1);
-        printf("op: %s", op_text_repr);
-        ast_print_expr(binary->left, indent + 1);
-        ast_print_expr(binary->right, indent + 1);
-    } break;
-    case EXPR_LITERAL: {
-        AstLiteral *lit = AS_LITERAL(head);
-        printf("%.*s", STR8VIEW_PRINT(lit->literal));
-        if (lit->sym != NULL) {
-            printf(":%d", lit->sym->seq_no);
-        }
-    } break;
-    case EXPR_CALL: {
-        AstCall *call = AS_CALL(head);
-        if (call->is_comptime) {
-            printf("@");
-        }
-        printf("%.*s", STR8VIEW_PRINT(call->identifier));
-        if (call->args) {
-            ast_print((AstNode *)call->args, indent + 1);
-        }
-    } break;
-    default:
-        ASSERT_NOT_REACHED;
+    if (head == NULL) {
+        return;
     }
-}
-
-void ast_print_stmt(AstStmt *head, u32 indent)
-{
     if (indent != 0) {
-        putchar('\n');
+        str_builder_append_u8(sb, '\n');
     }
-    print_indent(indent);
-    // printf("%s@%zu", node_kind_str_map[head->kind], head->line);
-    printf("%s", node_kind_str_map[head->kind]);
-    switch (head->kind) {
-    case STMT_WHILE: {
-        AstWhile *stmt = AS_WHILE(head);
-        ast_print_expr(stmt->condition, indent + 1);
-        ast_print_stmt(stmt->body, indent + 1);
-    }; break;
-    case STMT_IF: {
-        AstIf *stmt = AS_IF(head);
-        ast_print_expr(stmt->condition, indent + 1);
-        ast_print_stmt(stmt->then, indent + 1);
-        if (stmt->else_ != NULL) {
-            ast_print_stmt(stmt->else_, indent + 1);
-        }
-    }; break;
-    case STMT_BREAK:
-    case STMT_CONTINUE:
-    case STMT_RETURN:
-    case STMT_EXPR: {
-        AstSingle *stmt = AS_SINGLE(head);
-        if (stmt->node != NULL) {
-            ast_print(stmt->node, indent + 1);
-        }
-    }; break;
-    case STMT_PRINT: {
-        AstList *list = AS_LIST(head);
-        for (AstListNode *node = list->head; node != NULL; node = node->next) {
-            ast_print(node->this, indent + 1);
-        }
-    }; break;
-    case STMT_BLOCK: {
-        AstBlock *stmt = AS_BLOCK(head);
-        printf(" vars=");
-        ast_print_typed_var_list(stmt->declarations);
-        ast_print((AstNode *)stmt->stmts, indent + 1);
-    }; break;
-    case STMT_ASSIGNMENT: {
-        AstAssignment *stmt = AS_ASSIGNMENT(head);
-        ast_print_expr(stmt->left, indent + 1);
-        ast_print_expr(stmt->right, indent + 1);
-    }; break;
-    default:
-        ASSERT_NOT_REACHED;
-    }
-}
+    print_indent(sb, indent);
+    str_builder_append_u8(sb, '(');
+    str_builder_sprintf(sb, "%s ", 1, node_kind_str_map[head->kind]);
 
-void ast_print(AstNode *head, u32 indent)
-{
     if (AST_IS_EXPR(head)) {
-        ast_print_expr((AstExpr *)head, indent);
-        return;
-    }
-    if (AST_IS_STMT(head)) {
-        ast_print_stmt((AstStmt *)head, indent);
-        return;
+        /* Expressions */
+        switch (AS_EXPR(head)->kind) {
+        default:
+            ASSERT_NOT_REACHED;
+        case EXPR_UNARY: {
+            AstUnary *unary = AS_UNARY(head);
+            char *op_text_repr = token_type_str_map[unary->op];
+            str_builder_sprintf(sb, "%s", 1, op_text_repr);
+            ast_node_to_str(sb, AS_NODE(unary->expr), indent + 1);
+        } break;
+        case EXPR_BINARY: {
+            AstBinary *binary = AS_BINARY(head);
+            char *op_text_repr = token_type_str_map[binary->op];
+            str_builder_sprintf(sb, "%s", 1, op_text_repr);
+            ast_node_to_str(sb, AS_NODE(binary->left), indent + 1);
+            ast_node_to_str(sb, AS_NODE(binary->right), indent + 1);
+        } break;
+        case EXPR_LITERAL: {
+            AstLiteral *lit = AS_LITERAL(head);
+            str_builder_append_str8(sb, lit->literal);
+        } break;
+        case EXPR_CALL: {
+            AstCall *call = AS_CALL(head);
+            if (call->is_comptime) {
+                str_builder_append_u8(sb, '@');
+            }
+            str_builder_sprintf(sb, "\"%s\"", 1, call->identifier.str);
+            if (call->args) {
+                ast_node_to_str(sb, (AstNode *)call->args, indent + 1);
+            }
+        } break;
+        }
+    } else if (AST_IS_STMT(head)) {
+        /* Statements */
+        switch (AS_STMT(head)->kind) {
+        default:
+            ASSERT_NOT_REACHED;
+        case STMT_WHILE: {
+            AstWhile *stmt = AS_WHILE(head);
+            ast_node_to_str(sb, AS_NODE(stmt->condition), indent + 1);
+            ast_node_to_str(sb, AS_NODE(stmt->body), indent + 1);
+        }; break;
+        case STMT_IF: {
+            AstIf *stmt = AS_IF(head);
+            ast_node_to_str(sb, AS_NODE(stmt->condition), indent + 1);
+            ast_node_to_str(sb, AS_NODE(stmt->then), indent + 1);
+            if (stmt->else_ != NULL) {
+                ast_node_to_str(sb, AS_NODE(stmt->else_), indent + 1);
+            }
+        }; break;
+        case STMT_BREAK:
+        case STMT_CONTINUE:
+        case STMT_RETURN:
+        case STMT_EXPR: {
+            AstSingle *stmt = AS_SINGLE(head);
+            // NOTE: Can this ever be NULL???
+            if (stmt->node != NULL) {
+                ast_node_to_str(sb, AS_NODE(stmt->node), indent + 1);
+            }
+        }; break;
+        case STMT_PRINT: {
+            AstList *list = AS_LIST(head);
+            for (AstListNode *node = list->head; node != NULL; node = node->next) {
+                ast_node_to_str(sb, node->this, indent + 1);
+            }
+        }; break;
+        case STMT_BLOCK: {
+            AstBlock *stmt = AS_BLOCK(head);
+            str_builder_append_str8(sb, STR8_LIT(" vars="));
+            ast_print_typed_var_list(sb, stmt->declarations);
+            ast_node_to_str(sb, AS_NODE(stmt->stmts), indent + 1);
+        }; break;
+        case STMT_ASSIGNMENT: {
+            AstAssignment *stmt = AS_ASSIGNMENT(head);
+            ast_node_to_str(sb, AS_NODE(stmt->left), indent + 1);
+            ast_node_to_str(sb, AS_NODE(stmt->right), indent + 1);
+        }; break;
+        }
+    } else {
+        /* Declarations and containers */
+        switch (head->kind) {
+        default:
+            ASSERT_NOT_REACHED;
+        case AST_ROOT: {
+            AstRoot *root = AS_ROOT(head);
+            ast_node_to_str(sb, (AstNode *)(&root->vars), indent + 1);
+            ast_node_to_str(sb, (AstNode *)(&root->funcs), indent + 1);
+            ast_node_to_str(sb, (AstNode *)(&root->structs), indent + 1);
+            ast_node_to_str(sb, (AstNode *)(&root->enums), indent + 1);
+            ast_node_to_str(sb, (AstNode *)(&root->comptime_calls), indent + 1);
+        }; break;
+        case AST_FUNC: {
+            AstFunc *func_decl = AS_FUNC(head);
+            if (func_decl->body == NULL) {
+                str_builder_append_str8(sb, STR8_LIT("compiler internal "));
+            }
+            str_builder_sprintf(sb, "\"%s\"", 1, func_decl->name.str);
+            str_builder_append_str8(sb, STR8_LIT(" params="));
+            ast_print_typed_var_list(sb, func_decl->parameters);
+            if (func_decl->body != NULL) {
+                ast_node_to_str(sb, AS_NODE(func_decl->body), indent + 1);
+            }
+        }; break;
+        case AST_STRUCT: {
+            AstStruct *struct_decl = AS_STRUCT(head);
+            str_builder_sprintf(sb, "\"%s\"", 1, struct_decl->name.str);
+            str_builder_append_str8(sb, STR8_LIT(" members="));
+            ast_print_typed_var_list(sb, struct_decl->members);
+        }; break;
+        case AST_ENUM: {
+            AstEnum *enum_decl = AS_ENUM(head);
+            str_builder_sprintf(sb, "\"%s\"", 1, enum_decl->name.str);
+            str_builder_append_str8(sb, STR8_LIT(" members="));
+            for (u32 i = 0; i < enum_decl->members.len; i++) {
+                TypedIdent var = enum_decl->members.vars[i];
+                str_builder_append_str8(sb, var.name);
+                if (i != enum_decl->members.len - 1) {
+                    str_builder_append_u8(sb, ',');
+                    str_builder_append_u8(sb, ' ');
+                }
+            }
+        }; break;
+        case AST_LIST: {
+            AstList *list = AS_LIST(head);
+            for (AstListNode *node = list->head; node != NULL; node = node->next) {
+                ast_node_to_str(sb, node->this, indent + 1);
+            }
+        }; break;
+        case AST_TYPED_IDENT_LIST: {
+            AstTypedIdentList *node_var_list = AS_TYPED_IDENT_LIST(head);
+            ast_print_typed_var_list(sb, node_var_list->idents);
+        }; break;
+        }
     }
 
-    if (indent != 0) {
-        putchar('\n');
-    }
-    print_indent(indent);
-    printf("%s ", node_kind_str_map[head->kind]);
-    switch (head->kind) {
-    case AST_ROOT: {
-        AstRoot *root = AS_ROOT(head);
-        ast_print((AstNode *)(&root->vars), indent + 1);
-        ast_print((AstNode *)(&root->funcs), indent + 1);
-        ast_print((AstNode *)(&root->structs), indent + 1);
-        ast_print((AstNode *)(&root->enums), indent + 1);
-        ast_print((AstNode *)(&root->comptime_calls), indent + 1);
-    }; break;
-    case AST_FUNC: {
-        AstFunc *func = AS_FUNC(head);
-        if (func->body == NULL) {
-            printf("compiler internal ");
-        }
-        printf("name=%.*s", STR8VIEW_PRINT(func->name));
-        printf(" parameters=");
-        ast_print_typed_var_list(func->parameters);
-        if (func->body != NULL) {
-            ast_print_stmt(func->body, indent + 1);
-        }
-    }; break;
-    case AST_STRUCT: {
-        AstStruct *struct_decl = AS_STRUCT(head);
-        printf("name=%.*s", STR8VIEW_PRINT(struct_decl->name));
-        printf(" members=");
-        ast_print_typed_var_list(struct_decl->members);
-    }; break;
-    case AST_ENUM: {
-        AstEnum *enum_decl = AS_ENUM(head);
-        printf("name=%.*s", STR8VIEW_PRINT(enum_decl->name));
-        printf(" values=");
-        for (u32 i = 0; i < enum_decl->members.len; i++) {
-            TypedIdent var = enum_decl->members.vars[i];
-            printf("%.*s", STR8VIEW_PRINT(var.name));
-            if (i != enum_decl->members.len - 1) {
-                printf(", ");
-            }
-        }
-    }; break;
-    case AST_LIST: {
-        AstList *list = AS_LIST(head);
-        for (AstListNode *node = list->head; node != NULL; node = node->next) {
-            ast_print(node->this, indent + 1);
-        }
-    }; break;
-    case AST_TYPED_IDENT_LIST: {
-        AstTypedIdentList *node_var_list = AS_TYPED_IDENT_LIST(head);
-        ast_print_typed_var_list(node_var_list->idents);
-    }; break;
-    default:
-        ASSERT_NOT_REACHED;
-    }
+    // str_builder_append_u8(sb, '\n');
+    // print_indent_2(sb, indent);
+    str_builder_append_u8(sb, ')');
+}
+
+void ast_to_str(Str8Builder *sb, AstRoot *root)
+{
+    ast_node_to_str(sb, (AstNode *)root, 0);
+    str_builder_end(sb, true);
 }
