@@ -1,3 +1,13 @@
+//struct Pair := a: s32, b: s32
+//
+//func main(): s32
+//begin
+//    var pair: Pair
+//    pair.a := 10
+//    print pair.a
+//end
+
+
 func fib(n: s32): s32
 begin
     if n = 0 then return 0

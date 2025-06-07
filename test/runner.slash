@@ -10,37 +10,24 @@ loop file in $files {
     printf '\033[94mCheck %s:\033[0m\n' $file
     var content = (cat $file)
     
-    var source = (echo $content | sed -n '/^--- SOURCE ---$/,/^--- TREE ---$/p' | sed '1d;$d')
-    var tree = (echo $content | sed -n '/^--- TREE ---$/,/^--- OUTPUT ---$/p' | sed '1d;$d')
+    var source = (echo $content | sed -n '/^--- SOURCE ---$/,/^--- OUTPUT ---$/p' | sed '1d;$d')
     var output = (echo $content | sed -n '/^--- OUTPUT ---$/,$p' | sed '1d')
 
     var source_file = (mktemp)
     echo $source > $source_file
-    var tree_actual = (./metagenc -p $source_file)
-    var output_actual = (./metagenc $source_file)
-    var output_actual_bytecode = (./metagenc -br $source_file)
+    var output_actual = (./metagenc -t c $source_file)
+    var output_actual_bytecode = (./metagenc -t bytecode $source_file)
 
     # Make temporary files
-    var tree_file = (mktemp)
-    var tree_actual_file = (mktemp)
     var output_file = (mktemp)
     var output_actual_file = (mktemp)
     var output_actual_bytecode_file = (mktemp)
     
-    echo $tree > $tree_file
-    echo $tree_actual > $tree_actual_file
     echo $output > $output_file
     echo $output_actual > $output_actual_file
     echo $output_actual_bytecode > $output_actual_bytecode_file
     
-    # -Z to ignore trailing whitespace.
-    diff -Z $tree_actual_file $tree_file
     var failed = false
-    if $? != 0 {
-        printf '\033[91mDifferent syntax tree!\033[0m\n\n'
-        $failed = true
-    } 
-
     diff -Z $output_actual_file $output_file
     if $? != 0 {
         printf '\033[91mDifferent output!\033[0m\n\n'
@@ -61,7 +48,7 @@ loop file in $files {
     }
     
     # Remove temporary files
-    rm $tree_file $tree_actual_file $output_file $output_actual_file $output_actual_bytecode_file
+    rm $output_file $output_actual_file $output_actual_bytecode_file
 }
 
 echo "-- Summary -- "
