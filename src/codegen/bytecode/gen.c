@@ -434,7 +434,7 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *bc, AstStmt *head)
     debug_line = head->line;
     switch (head->kind) {
     default:
-        printf("Ast stmt %d not handled\n", head->kind);
+        printf("Ast stmt %s not handled\n", ast_node_kind_str_map[head->kind]);
         break;
     case STMT_ASSIGNMENT: {
         AstAssignment *assignment = AS_ASSIGNMENT(head);

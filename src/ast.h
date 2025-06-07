@@ -277,7 +277,7 @@ typedef struct {
 #define AS_LIST(___node) ((AstList *)(___node))
 #define AS_ROOT(___node) ((AstRoot *)(___node))
 
-extern char *node_kind_str_map[AST_NODE_TYPE_LEN];
+extern char *ast_node_kind_str_map[AST_NODE_TYPE_LEN];
 
 
 /* Expresions */

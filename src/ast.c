@@ -17,10 +17,8 @@
 #include "ast.h"
 #include "base.h"
 #include "lex.h"
-#include "type.h"
-#include <stdio.h>
 
-char *node_kind_str_map[AST_NODE_TYPE_LEN] = {
+char *ast_node_kind_str_map[AST_NODE_TYPE_LEN] = {
     "EXPR_UNARY", "EXPR_BINARY", "EXPR_LITERAL",         "EXPR_CALL",   "STMT_WHILE",
     "STMT_IF",    "STMT_BREAK",  "STMT_CONTINUE",        "STMT_RETURN", "STMT_EXPR",
     "STMT_PRINT", "STMT_BLOCK",  "STMT_ASSIGNMENT",      "AST_FUNC",    "AST_STRUCT",
@@ -245,7 +243,7 @@ static void ast_node_to_str(Str8Builder *sb, AstNode *head, u32 indent)
     }
     print_indent(sb, indent);
     str_builder_append_u8(sb, '(');
-    str_builder_sprintf(sb, "%s ", 1, node_kind_str_map[head->kind]);
+    str_builder_sprintf(sb, "%s ", 1, ast_node_kind_str_map[head->kind]);
 
     if (AST_IS_EXPR(head)) {
         /* Expressions */
