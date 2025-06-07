@@ -32,11 +32,15 @@
 #include "type.h"
 
 
+typedef enum {
+    TARGET_C = 0,
+    TARGET_BYTECODE = 1,
+} MetagenTarget;
+
 typedef struct {
     u32 log_level; /* 0: Only log erros. 1: Log warnings. 2: Log everything. */
     bool parse_only; /* Stops after parsing and prints the syntax tree */
-    bool bytecode_backend; /* Emits bytecode instead of the default C backend */
-    bool run_bytecode; /* Treat the input as bytecode and run it */
+    MetagenTarget target;
     bool debug_bytecode; /* Bytecode backend goes into debug mode */
 } MetagenOptions;
 
@@ -136,7 +140,7 @@ u32 compile(char *file_name, Str8 source)
     } while (had_to_resolve);
 
     /* Backend */
-    if (options.bytecode_backend && options.run_bytecode) {
+    if (options.target == TARGET_BYTECODE) {
         LOG_DEBUG_NOARG("Generating bytecode");
         Bytecode bytecode = ast_root_to_bytecode(compiler.symt_root, ast_root);
         if (options.debug_bytecode) {
@@ -173,13 +177,11 @@ int main(int argc, char *argv[])
      * option range description
      * -l     0-2   Log level
      * -p           Parse only. Prints the syntax tree.
-     * -b           Emits bytecode instead of the default C backend.
-     * -r           Treat the input as bytecode and run it. If used with -b then it runs the
-     *              bytecode directly.
+     * -t           Target. c or bytecode.
      * -d           Debug bytecode.
      */
     int opt;
-    while ((opt = getopt(argc, argv, "l:pbrd")) != -1) {
+    while ((opt = getopt(argc, argv, "l:t:pd")) != -1) {
         switch (opt) {
         case 'l': {
             int log_level = atoi(optarg);
@@ -189,14 +191,19 @@ int main(int argc, char *argv[])
             }
             options.log_level = log_level;
         } break;
+        case 't': {
+            if (strcmp(optarg, "c") == 0) {
+                options.target = TARGET_C;
+            } else if (strcmp(optarg, "bytecode") == 0) {
+                options.target = TARGET_BYTECODE;
+            } else {
+                fprintf(stderr, "Error: Unsupported target '%s'\n", optarg);
+                fprintf(stderr, "Supported targets:\n\tc\n\tbytecode\n");
+                return EXIT_FAILURE;
+            }
+        } break;
         case 'p':
             options.parse_only = true;
-            break;
-        case 'b':
-            options.bytecode_backend = true;
-            break;
-        case 'r':
-            options.run_bytecode = true;
             break;
         case 'd':
             options.debug_bytecode = true;
