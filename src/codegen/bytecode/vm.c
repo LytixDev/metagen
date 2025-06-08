@@ -162,7 +162,7 @@ BytecodeWord run(Bytecode bytecode, bool debug)
             }
         } break;
 
-        /* Stack manipulation */
+        /* Memory manipulation */
         case OP_LI: {
             BytecodeWord value = nextw(&vm);
             pushw(&vm, value);
@@ -183,6 +183,15 @@ BytecodeWord run(Bytecode bytecode, bool debug)
             BytecodeQuarter bp_offset = nextq(&vm);
             BytecodeWord value = popw(&vm);
             stw(&vm, vm.bp + bp_offset, value);
+        } break;
+        case OP_LDA: {
+            BytecodeWord mem_pos = nextw(&vm);
+            pushw(&vm, ldw(&vm, mem_pos));
+        } break;
+        case OP_STA: {
+            BytecodeWord mem_pos = nextw(&vm);
+            BytecodeWord value = popw(&vm);
+            stw(&vm, mem_pos, value);
         } break;
 
         case OP_PRINT: {

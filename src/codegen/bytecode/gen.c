@@ -43,8 +43,10 @@ struct stack_vars_t {
 #define BREAK_MAX_DEPTH 128
 
 typedef enum {
-    BCF_STORE_IDENT = 1,
-    BCF_LOAD_IDENT = 2,
+    BCF_STORE = 1,
+    BCF_LOAD = 2,
+    BCF_LOCAL = 4,
+    BCF_ABS = 8,
 } BytecodeCompilerFlags;
 
 typedef struct {
@@ -59,8 +61,13 @@ typedef struct {
     StackVars *stack_vars;
     s64 bp_stack_offset;
 
-    HashMap globals; // Key: Symbol name, Value: Absolute position in the stack
-    HashMap functions; // Key: Symbol name, Value: Absolute position of first instruction in code
+    /* 
+     * The values in these maps are stored as their original value + 1 so that the value of 
+     * 0 is not treated as a NULL pointer. A nicer solution would be if the hasmap returned a 
+     * Result type of some sorts. I should really improve the HashMap impl one of these days ... 
+     */
+    HashMap globals; // Key: Symbol name, Value: Absolute position in the stack (+1)
+    HashMap functions; // Key: Symbol name, Value: Absolute position of first instruction in code (+1)
     PatchCall patches[100];
     u32 calls_to_patch;
 
@@ -130,6 +137,8 @@ static void disassemble_instruction(Bytecode *b, Str8List source_lines)
         printed_chars += printf(" %d", value);
     }; break;
     // case OP_JMP:
+    case OP_LDA:
+    case OP_STA:
     case OP_LI: {
         BytecodeWord value = *(BytecodeWord *)(b->code + b->code_offset);
         b->code_offset += sizeof(BytecodeWord);
@@ -191,7 +200,7 @@ static u32 writew(Bytecode *b, BytecodeWord v)
     return b->code_offset;
 }
 
-static void writei(Bytecode *b, BytecodeQuarter v)
+static void writeq(Bytecode *b, BytecodeQuarter v)
 {
     *(BytecodeQuarter *)(b->code + b->code_offset) = v;
     b->code_offset += sizeof(BytecodeQuarter);
@@ -207,9 +216,35 @@ static void patchi(Bytecode *b, u32 offset, BytecodeQuarter value)
     *(BytecodeQuarter *)(b->code + offset) = value;
 }
 
+// TODO: use this instead of dividing by 8!
 static s64 bytes_to_words(s64 bytes)
 {
     return (bytes + sizeof(BytecodeWord) - 1) / sizeof(BytecodeWord);
+}
+
+static void write_instruction_load_or_store(BytecodeCompiler *bc, u32 offset, s64 debug_source_line)
+{
+    if (bc->flags & BCF_STORE) {
+        if (bc->flags & BCF_LOCAL) {
+            /* bp-relatie store */
+            write_instruction(&bc->bytecode, OP_STBP, debug_source_line);
+            writeq(&bc->bytecode, offset);
+        } else {
+            /* absolute store */
+            write_instruction(&bc->bytecode, OP_STA, debug_source_line);
+            writew(&bc->bytecode, offset);
+        }
+    } else {
+        if (bc->flags & BCF_LOCAL) {
+            /* bp-relative load */
+            write_instruction(&bc->bytecode, OP_LDBP, debug_source_line);
+            writeq(&bc->bytecode, offset);
+        } else {
+            /* absolute load */
+            write_instruction(&bc->bytecode, OP_LDA, debug_source_line);
+            writew(&bc->bytecode, offset);
+        }
+    }
 }
 
 static StackVars *make_stack_vars(StackVars *parent)
@@ -240,15 +275,28 @@ static void stack_vars_set(StackVars *s, Str8 name, s64 bp_rel_offset)
     hashmap_put(&s->map, name.str, name.len, (void *)(bp_rel_offset), sizeof(void *), false);
 }
 
-static BytecodeQuarter stack_vars_get(BytecodeCompiler *bc, Str8 name)
+static BytecodeQuarter get_var_slot(BytecodeCompiler *bc, Str8 name)
 {
     for (StackVars *locals = bc->stack_vars; locals; locals = locals->parent) {
         BytecodeQuarter *offset = hashmap_get(&locals->map, name.str, name.len);
         if (offset != NULL) {
+            /* Set compiler flag to load or store to bp-relative memory */
+            bc->flags &= ~BCF_ABS;
+            bc->flags |= BCF_LOCAL;
             return (BytecodeQuarter)(((size_t)offset) - STACK_VAR_MAP_ADD);
         }
     }
-    ASSERT_NOT_REACHED;
+    /* Variable not on the stack, so it must be a global */
+    void *offset = hashmap_get(&bc->globals, name.str, name.len);
+    if (offset == NULL) {
+        LOG_FATAL("Internal error. Bytecode compiler could not resolve variable '%s'", name.str);
+        exit(1);
+    }
+
+    /* Set compiler flag to load or store to absolute memory */
+    bc->flags &= ~BCF_LOCAL;
+    bc->flags |= BCF_ABS;
+    return ((BytecodeWord)offset) - 1;
 }
 
 static void stack_vars_print(StackVars *s)
@@ -296,7 +344,7 @@ static void bytecode_compiler_init(BytecodeCompiler *bc, SymbolTable symt_root)
 {
     bc->bytecode.code_offset = 0;
     bc->symt_root = symt_root;
-    bc->flags = BCF_LOAD_IDENT;
+    bc->flags = BCF_LOAD | BCF_LOCAL;
     bc->calls_to_patch = 0;
     bc->loop_i = 0;
     bc->break_i = 0;
@@ -364,10 +412,11 @@ static void ast_expr_access_struct_member(BytecodeCompiler *bc, AstBinary *expr)
     }
     assert(member_offset != -1);
 
-    BytecodeQuarter bp_offset = stack_vars_get(bc, struct_lit->sym->name);
-    bp_offset += member_offset / 8;
-    write_instruction(&bc->bytecode, bc->flags == BCF_STORE_IDENT ? OP_STBP : OP_LDBP, debug_line);
-    writei(&bc->bytecode, bp_offset);
+    BytecodeQuarter bp_offset = get_var_slot(bc, struct_lit->sym->name);
+    bp_offset += member_offset / sizeof(BytecodeWord);
+    write_instruction_load_or_store(bc, bp_offset, debug_line);
+    //write_instruction(&bc->bytecode, bc->flags == BCF_STORE_LOCAL ? OP_STBP : OP_LDBP, debug_line);
+    //writeq(&bc->bytecode, bp_offset);
 }
 
 static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
@@ -394,7 +443,7 @@ static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
 
         /* Make stack space for return value */
         write_instruction(&bc->bytecode, OP_PUSHN, debug_line);
-        writei(&bc->bytecode, return_type_space);
+        writeq(&bc->bytecode, return_type_space);
 
         /* Push args */
         if (call->args) {
@@ -413,7 +462,7 @@ static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
         /* Reclaim stack space */
         // NOTE/TODO: we never reclaim the return value as we expect it to be used in an assignment
         write_instruction(&bc->bytecode, OP_POPN, debug_line);
-        writei(&bc->bytecode, arg_space_words);
+        writeq(&bc->bytecode, arg_space_words);
     } break;
     case EXPR_BINARY: {
         AstBinary *expr = AS_BINARY(head);
@@ -469,9 +518,11 @@ static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
             write_instruction(&bc->bytecode, OP_LI, debug_line);
             writew(&bc->bytecode, literal);
         } else if (expr->lit_type == LIT_IDENT) {
-            write_instruction(&bc->bytecode, bc->flags == BCF_STORE_IDENT ? OP_STBP : OP_LDBP,
-                              debug_line);
-            writei(&bc->bytecode, stack_vars_get(bc, expr->sym->name));
+            u32 slot = get_var_slot(bc, expr->sym->name);
+            write_instruction_load_or_store(bc, slot, debug_line);
+            // write_instruction(&bc->bytecode, bc->flags == BCF_STORE_LOCAL ? OP_STBP : OP_LDBP,
+            //                   debug_line);
+            // writeq(&bc->bytecode, get_var_slot(bc, expr->sym->name));
         } else {
             printf("Ast literal expr kind not handled\n");
         }
@@ -489,9 +540,13 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *bc, AstStmt *head)
     case STMT_ASSIGNMENT: {
         AstAssignment *assignment = AS_ASSIGNMENT(head);
         ast_expr_to_bytecode(bc, assignment->right);
-        bc->flags = BCF_STORE_IDENT;
+        /* Set mode to store */
+        bc->flags &= ~BCF_LOAD;
+        bc->flags |= BCF_STORE;
         ast_expr_to_bytecode(bc, assignment->left);
-        bc->flags = BCF_LOAD_IDENT;
+        /* Set mode back to store store */
+        bc->flags &= ~BCF_STORE;
+        bc->flags |= BCF_LOAD;
     } break;
     case STMT_IF: {
         AstIf *if_ = AS_IF(head);
@@ -499,7 +554,7 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *bc, AstStmt *head)
         ast_expr_to_bytecode(bc, if_->condition);
         /* If false, jump to the else branch */
         u32 else_target = write_instruction(&bc->bytecode, OP_BIZ, head->line);
-        writei(&bc->bytecode, 0);
+        writeq(&bc->bytecode, 0);
         /* If branch */
         ast_stmt_to_bytecode(bc, if_->then);
         /* Skip the else branch */
@@ -532,7 +587,7 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *bc, AstStmt *head)
         ast_expr_to_bytecode(bc, while_->condition);
         /* If condition is zero, skip body */
         u32 end_target = write_instruction(&bc->bytecode, OP_BIZ, head->line);
-        writei(&bc->bytecode, 0);
+        writeq(&bc->bytecode, 0);
         /* Loop body */
         ast_stmt_to_bytecode(bc, while_->body);
         /* Jump back to the condition */
@@ -577,7 +632,7 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *bc, AstStmt *head)
             var_space_in_words = new_stack_vars_from_block(bc, block->symt_local);
             // stack_vars_print(bc->stack_vars);
             write_instruction(&bc->bytecode, OP_PUSHN, head->line);
-            writei(&bc->bytecode, var_space_in_words);
+            writeq(&bc->bytecode, var_space_in_words);
         }
 
         for (AstListNode *n = block->stmts->head; n != NULL; n = n->next) {
@@ -586,7 +641,7 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *bc, AstStmt *head)
 
         if (new_vars) {
             write_instruction(&bc->bytecode, OP_POPN, head->line);
-            writei(&bc->bytecode, var_space_in_words);
+            writeq(&bc->bytecode, var_space_in_words);
             /* Delete stack vars from current block */
             StackVars *old = bc->stack_vars;
             bc->stack_vars = old->parent;
@@ -609,9 +664,9 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *bc, AstStmt *head)
         AstSingle *stmt = AS_SINGLE(head);
         ast_expr_to_bytecode(bc, (AstExpr *)stmt->node);
         /* Now, the return value is on the stack. We need to store it in the retun value slot. */
-        BytecodeQuarter return_slot_offset = stack_vars_get(bc, return_var_internal_name);
+        BytecodeQuarter return_slot_offset = get_var_slot(bc, return_var_internal_name);
         write_instruction(&bc->bytecode, OP_STBP, debug_line);
-        writei(&bc->bytecode, return_slot_offset);
+        writeq(&bc->bytecode, return_slot_offset);
         write_instruction(&bc->bytecode, OP_RET, (s64)-1);
     } break;
     }
@@ -721,35 +776,56 @@ Bytecode ast_root_to_bytecode(SymbolTable symt_root, AstRoot *root)
 {
     assert(root->funcs.head != NULL);
     return_var_internal_name = STR8_LIT("__RETURN__VAR__");
-    BytecodeCompiler bytecode_compiler;
-    bytecode_compiler_init(&bytecode_compiler, symt_root);
+    BytecodeCompiler bc;
+    bytecode_compiler_init(&bc, symt_root);
 
-    /* TODO: Make space for global varibales */
+    /* 
+     * Make space for global varibales.
+     * NOTE: Currently this will generate instructions to reserve enough stack space to 
+     *       hold the global variables. A different approach could be to store them in a 
+     *       seperate table or something. This was the simplest I came up with for now,
+     *       but may not be a particularly good solution.
+     */
+    s64 globals_space = 0;
+    for (u32 i = 0; i < symt_root.sym_len; i++) {
+        Symbol *global_var = symt_root.symbols[i];
+        if (global_var->kind != SYMBOL_GLOBAL_VAR) {
+            continue;
+        }
+        hashmap_put_str(&bc.globals, &global_var->name, (void *)(globals_space + 1), sizeof(void *), false);
+        globals_space += type_info_byte_size(global_var->type_info);
+        globals_space = (s64)align_forward(globals_space, sizeof(BytecodeWord));
+    }
+    BytecodeQuarter globals_slots = globals_space / sizeof(BytecodeWord);
+    write_instruction(&bc.bytecode, OP_PUSHN, -1);
+    writeq(&bc.bytecode, globals_slots);
+
 
     /* Generate main function */
     if (root->main_function == NULL) {
-        fprintf(stderr, "no main function, panic!"); // TODO: better error handling
+        LOG_FATAL_NOARG("Bytecode compiler found no main function");
+        exit(1);
     } else {
         // NOTE: right now we assume the main function takes no arguments
-        ast_func_to_bytecode(&bytecode_compiler, root->main_function, true);
+        ast_func_to_bytecode(&bc, root->main_function, true);
     }
 
     /* Generate all other functions */
     for (AstListNode *node = root->funcs.head; node != NULL; node = node->next) {
         AstFunc *func = AS_FUNC(node->this);
         if (!STR8_EQUAL(func->name, STR8_LIT("main"))) {
-            ast_func_to_bytecode(&bytecode_compiler, func, false);
+            ast_func_to_bytecode(&bc, func, false);
         }
     }
 
     /* Patch calls */
-    for (u32 i = 0; i < bytecode_compiler.calls_to_patch; i++) {
-        PatchCall patch = bytecode_compiler.patches[i];
-        u32 actual = func_get_start(&bytecode_compiler, patch.func_name);
-        patchw(&bytecode_compiler.bytecode, patch.offset, (BytecodeWord)actual);
+    for (u32 i = 0; i < bc.calls_to_patch; i++) {
+        PatchCall patch = bc.patches[i];
+        u32 actual = func_get_start(&bc, patch.func_name);
+        patchw(&bc.bytecode, patch.offset, (BytecodeWord)actual);
     }
 
 
-    bytecode_compiler_free(&bytecode_compiler);
-    return bytecode_compiler.bytecode;
+    bytecode_compiler_free(&bc);
+    return bc.bytecode;
 }

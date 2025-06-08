@@ -293,6 +293,8 @@ struct hashmap_t {
     // #endif
 };
 
+typedef struct str8_t Str8;
+
 void hashmap_init(struct hashmap_t *map);
 
 void hashmap_free(struct hashmap_t *map);
@@ -304,6 +306,7 @@ void hashmap_put(struct hashmap_t *map, void *key, u32 key_size, void *value, u3
 #define hashmap_ssput(map, key, value, alloc_flag)                 \
     hashmap_put(map, key, (strlen(key) + 1) * sizeof(char), value, \
                 (strlen(value) + 1) * sizeof(char), alloc_flag)
+void hashmap_put_str(struct hashmap_t *map, Str8 *key, void *value, u32 val_size, bool alloc_flag);
 
 void *hashmap_get(struct hashmap_t *map, void *key, u32 key_size);
 #define hashmap_sget(map, key) hashmap_get(map, key, (strlen(key) + 1) * sizeof(char))
@@ -384,7 +387,7 @@ void linkedlist_print(struct linkedlist_t *ll);
  * Should always be null terminated.
  * Size does not include null terminator.
  */
-typedef struct {
+typedef struct str8_t {
     size_t len;
     u8 *str;
 } Str8;
@@ -988,6 +991,11 @@ static void increase(struct hashmap_t *map)
 
     free(map->buckets);
     map->buckets = new_buckets;
+}
+
+void hashmap_put_str(struct hashmap_t *map, Str8 *key, void *value, u32 val_size, bool alloc_flag)
+{
+    hashmap_put(map, key->str, key->len, value, val_size, alloc_flag);
 }
 
 void hashmap_put(struct hashmap_t *map, void *key, u32 key_size, void *value, u32 val_size,

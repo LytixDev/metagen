@@ -66,8 +66,8 @@ typedef enum {
     OP_POPN, // read q, pop q words (inverse of pushn)
     OP_LDBP, // read q, load bp + q as a, push a
     OP_STBP, // read q, pop a, store a at bp + q
-    OP_LDA, // TODO
-    OP_STA, // TODO
+    OP_LDA, // read w, load w as a, push a
+    OP_STA, // read w, pop a, store at w
 
     OP_PRINT, // read b, pop b words, print popped words
     OP_CALL, // read w, push pc, set pc = w
