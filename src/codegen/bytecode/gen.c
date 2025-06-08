@@ -45,8 +45,11 @@ struct stack_vars_t {
 typedef enum {
     BCF_STORE = 1,
     BCF_LOAD = 2,
-    BCF_LOCAL = 4,
-    BCF_ABS = 8,
+
+    /* Determines which kind of load/store will be generated */
+    BCF_LOCAL = 4, // LDBP/STBP
+    BCF_ABS = 8, // LDA/STA
+    BCF_ABS_IMM = 16, // LDI/STI
 } BytecodeCompilerFlags;
 
 typedef struct {
@@ -83,7 +86,7 @@ typedef struct {
 char *op_code_str_map[OP_TYPE_LEN] = {
     "ADD",  "SUB", "MUL", "DIV",   "LSHIFT", "RSHIFT",  "GE",   "LE",
     "NOT",  "JMP", "BIZ", "BNZ",   "LI",     "PUSHN",   "POPN", "LDBP",
-    "STBP", "LDA", "STA", "PRINT", "CALL",   "FUNCPRO", "RET",  "EXIT", "NOP",
+    "STBP", "LDA", "STA", "LDI", "STI", "PRINT", "CALL",   "FUNCPRO", "RET",  "EXIT", "NOP",
 };
 
 s64 debug_line = -1;
@@ -136,7 +139,7 @@ static void disassemble_instruction(Bytecode *b, Str8List source_lines)
         b->code_offset += sizeof(BytecodeQuarter);
         printed_chars += printf(" %d", value);
     }; break;
-    // case OP_JMP:
+    case OP_JMP:
     case OP_LDA:
     case OP_STA:
     case OP_LI: {
@@ -229,20 +232,26 @@ static void write_instruction_load_or_store(BytecodeCompiler *bc, u32 offset, s6
             /* bp-relatie store */
             write_instruction(&bc->bytecode, OP_STBP, debug_source_line);
             writeq(&bc->bytecode, offset);
-        } else {
+        } else if (bc->flags & BCF_ABS) {
             /* absolute store */
             write_instruction(&bc->bytecode, OP_STA, debug_source_line);
             writew(&bc->bytecode, offset);
+        } else {
+            /* address for store from immediate */
+            write_instruction(&bc->bytecode, OP_STI, debug_source_line);
         }
     } else {
         if (bc->flags & BCF_LOCAL) {
             /* bp-relative load */
             write_instruction(&bc->bytecode, OP_LDBP, debug_source_line);
             writeq(&bc->bytecode, offset);
-        } else {
+        } else if (bc->flags & BCF_ABS) {
             /* absolute load */
             write_instruction(&bc->bytecode, OP_LDA, debug_source_line);
             writew(&bc->bytecode, offset);
+        } else {
+            /* address for load from immediate */
+            write_instruction(&bc->bytecode, OP_LDI, debug_source_line);
         }
     }
 }
@@ -415,8 +424,6 @@ static void ast_expr_access_struct_member(BytecodeCompiler *bc, AstBinary *expr)
     BytecodeQuarter bp_offset = get_var_slot(bc, struct_lit->sym->name);
     bp_offset += member_offset / sizeof(BytecodeWord);
     write_instruction_load_or_store(bc, bp_offset, debug_line);
-    //write_instruction(&bc->bytecode, bc->flags == BCF_STORE_LOCAL ? OP_STBP : OP_LDBP, debug_line);
-    //writeq(&bc->bytecode, bp_offset);
 }
 
 static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
@@ -472,6 +479,45 @@ static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
             ast_expr_access_struct_member(bc, expr);
             break;
         }
+        /* 
+         * Indexing has to be handled seperately.
+         * The procedure goes like so:
+         * - Evaluate index (has to be done at runtime)
+         * - Multiply index by the size of the underlying array type
+         * - Add the base memory offset of the array
+         * - Emit a LDI/STI instruction based on this runtime value
+         */
+        if (expr->op == TOKEN_LBRACKET) {
+            // NOTE: Assuming LHS is a variable and an array. Is this always true?
+            AstLiteral *left = AS_LITERAL(expr->left);
+            assert(left->kind == EXPR_LITERAL);
+            assert(left->sym->type_info->kind == TYPE_ARRAY);
+
+            /* Will evaluate the index */
+            ast_expr_to_bytecode(bc, expr->right);
+            /* Evaluate type size and multiply the index by that amount */
+            TypeInfoArray *array_type = (TypeInfoArray *)left->sym->type_info;
+            TypeInfo *underlying = array_type->element_type;
+            u32 underlying_type_size = type_info_byte_size(underlying);
+            underlying_type_size = align_forward(underlying_type_size, sizeof(BytecodeWord));
+            write_instruction(&bc->bytecode, OP_LI, debug_line);
+            writew(&bc->bytecode, underlying_type_size);
+            write_instruction(&bc->bytecode, OP_MUL, debug_line);
+            /* Find array base offset and add the index */
+            u32 slot = get_var_slot(bc, left->sym->name);
+            write_instruction(&bc->bytecode, OP_LI, debug_line);
+            writew(&bc->bytecode, slot);
+            write_instruction(&bc->bytecode, OP_ADD, debug_line);
+
+            // TODO: This is inelegant
+            u32 flags_old = bc->flags;
+            bc->flags &= ~BCF_LOCAL;
+            bc->flags &= ~BCF_ABS;
+            bc->flags |= BCF_ABS_IMM;
+            write_instruction_load_or_store(bc, slot, debug_line);
+            bc->flags = flags_old;
+            break;
+        }
         ast_expr_to_bytecode(bc, expr->right);
         ast_expr_to_bytecode(bc, expr->left);
         switch (expr->op) {
@@ -520,9 +566,6 @@ static void ast_expr_to_bytecode(BytecodeCompiler *bc, AstExpr *head)
         } else if (expr->lit_type == LIT_IDENT) {
             u32 slot = get_var_slot(bc, expr->sym->name);
             write_instruction_load_or_store(bc, slot, debug_line);
-            // write_instruction(&bc->bytecode, bc->flags == BCF_STORE_LOCAL ? OP_STBP : OP_LDBP,
-            //                   debug_line);
-            // writeq(&bc->bytecode, get_var_slot(bc, expr->sym->name));
         } else {
             printf("Ast literal expr kind not handled\n");
         }
@@ -793,7 +836,18 @@ Bytecode ast_root_to_bytecode(SymbolTable symt_root, AstRoot *root)
             continue;
         }
         hashmap_put_str(&bc.globals, &global_var->name, (void *)(globals_space + 1), sizeof(void *), false);
-        globals_space += type_info_byte_size(global_var->type_info);
+        if (global_var->type_info->kind == TYPE_ARRAY) {
+            /* 
+             * NOTE: Since we only support loads and stores at the granularity of a word,
+             *       we have to allocate each element as a multiple of a word. Kinda sucks
+             *       if we have a list of u8's as we have to pad 7 bytes between each element !
+             */
+            TypeInfoArray *array_type = (TypeInfoArray *)global_var->type_info;
+            globals_space += array_type->elements *
+                align_forward(type_info_byte_size(array_type->element_type), sizeof(BytecodeWord));
+        } else {
+            globals_space += type_info_byte_size(global_var->type_info);
+        }
         globals_space = (s64)align_forward(globals_space, sizeof(BytecodeWord));
     }
     BytecodeQuarter globals_slots = globals_space / sizeof(BytecodeWord);

@@ -193,6 +193,17 @@ BytecodeWord run(Bytecode bytecode, bool debug)
             BytecodeWord value = popw(&vm);
             stw(&vm, mem_pos, value);
         } break;
+        case OP_LDI: {
+            BytecodeWord mem_pos = popw(&vm);
+            BytecodeWord value = ldw(&vm, mem_pos);
+            //pushw(&vm, ldw(&vm, mem_pos));
+            pushw(&vm, value);
+        } break;
+        case OP_STI: {
+            BytecodeWord mem_pos = popw(&vm);
+            BytecodeWord value = popw(&vm);
+            stw(&vm, mem_pos, value);
+        } break;
 
         case OP_PRINT: {
             u8 n_args = next_u8(&vm);

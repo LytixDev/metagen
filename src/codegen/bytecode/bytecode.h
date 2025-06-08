@@ -60,7 +60,7 @@ typedef enum {
     OP_BIZ, // read q, pop a, if a == 0 set pc += q
     OP_BNZ, // read q, pop a, if a != 0 set pc += q
 
-    /* stack operations */
+    /* Memory operations */
     OP_LI, // read w, push w
     OP_PUSHN, // read q, push q words (making space for q words on the stack)
     OP_POPN, // read q, pop q words (inverse of pushn)
@@ -68,6 +68,8 @@ typedef enum {
     OP_STBP, // read q, pop a, store a at bp + q
     OP_LDA, // read w, load w as a, push a
     OP_STA, // read w, pop a, store at w
+    OP_LDI, // pop a, load a as b, push b
+    OP_STI, // pop a, pop b, store a at b
 
     OP_PRINT, // read b, pop b words, print popped words
     OP_CALL, // read w, push pc, set pc = w

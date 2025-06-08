@@ -55,7 +55,7 @@ typedef enum {
     // Misc..
     TOKEN_LPAREN,
     TOKEN_RPAREN,
-    TOKEN_LBRACKET,
+    TOKEN_LBRACKET, // [, used for indexing
     TOKEN_RBRACKET,
     TOKEN_DOT,
     TOKEN_COMMA,
