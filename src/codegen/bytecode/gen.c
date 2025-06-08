@@ -24,18 +24,6 @@
 #include "codegen/bytecode/gen.h"
 #include "type.h"
 
-char *op_code_str_map[OP_TYPE_LEN] = {
-    "ADD",  "SUB", "MUL", "DIV",   "LSHIFT", "RSHIFT",  "GE",   "LE",
-    "NOT",  "JMP", "BIZ", "BNZ",   "LI",     "PUSHN",   "POPN", "LDBP",
-    "STBP", "LDA", "STA", "PRINT", "CALL",   "FUNCPRO", "RET",  "EXIT",
-};
-
-
-s64 debug_line = -1;
-s64 lines_written = -1;
-Str8 return_var_internal_name;
-
-
 /*
  * Each function gets their own.
  * Each scope gets their own.
@@ -50,6 +38,9 @@ struct stack_vars_t {
  * Otherwise, a bp_rel_offset of 0 would be treated as the NULL pointer.
  */
 #define STACK_VAR_MAP_ADD (S16_MAX + 2)
+
+#define LOOP_MAX_DEPTH 128
+#define BREAK_MAX_DEPTH 128
 
 typedef enum {
     BCF_STORE_IDENT = 1,
@@ -72,8 +63,25 @@ typedef struct {
     HashMap functions; // Key: Symbol name, Value: Absolute position of first instruction in code
     PatchCall patches[100];
     u32 calls_to_patch;
+
+    u32 loop_offsets[LOOP_MAX_DEPTH]; // Stack, holds the starting offset of loops.
+    u32 loop_i; // Current index into loop_offsets
+    u32 break_offsets[BREAK_MAX_DEPTH];
+    u32 break_i;
+
     BytecodeCompilerFlags flags;
 } BytecodeCompiler;
+
+
+char *op_code_str_map[OP_TYPE_LEN] = {
+    "ADD",  "SUB", "MUL", "DIV",   "LSHIFT", "RSHIFT",  "GE",   "LE",
+    "NOT",  "JMP", "BIZ", "BNZ",   "LI",     "PUSHN",   "POPN", "LDBP",
+    "STBP", "LDA", "STA", "PRINT", "CALL",   "FUNCPRO", "RET",  "EXIT", "NOP",
+};
+
+s64 debug_line = -1;
+s64 lines_written = -1;
+Str8 return_var_internal_name;
 
 
 static uintptr_t align_forward(uintptr_t ptr, size_t align)
@@ -136,7 +144,7 @@ static void disassemble_instruction(Bytecode *b, Str8List source_lines)
     }
 
     if (source_line != -1) {
-        printf("%-3zu", source_line + 1);
+        printf("%-3zu", source_line);
         /* Ensures we only write each source line once */
         if (source_line > lines_written) {
             /* Do not print indent */
@@ -290,6 +298,8 @@ static void bytecode_compiler_init(BytecodeCompiler *bc, SymbolTable symt_root)
     bc->symt_root = symt_root;
     bc->flags = BCF_LOAD_IDENT;
     bc->calls_to_patch = 0;
+    bc->loop_i = 0;
+    bc->break_i = 0;
     hashmap_init(&bc->globals);
     hashmap_init(&bc->functions);
 }
@@ -510,7 +520,15 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *bc, AstStmt *head)
     } break;
     case STMT_WHILE: {
         AstWhile *while_ = AS_WHILE(head);
-        u32 condition_target = bc->bytecode.code_offset;
+        u32 loop_start_offset = bc->bytecode.code_offset;
+        bc->loop_i++;
+        bc->loop_offsets[bc->loop_i] = loop_start_offset;
+        if (bc->loop_i >= LOOP_MAX_DEPTH) {
+            LOG_FATAL("Max loop depth (%d) exceeded during bytecode compilation", LOOP_MAX_DEPTH);
+            exit(1);
+        }
+        u32 break_i_prev = bc->break_i;
+
         ast_expr_to_bytecode(bc, while_->condition);
         /* If condition is zero, skip body */
         u32 end_target = write_instruction(&bc->bytecode, OP_BIZ, head->line);
@@ -519,11 +537,37 @@ static void ast_stmt_to_bytecode(BytecodeCompiler *bc, AstStmt *head)
         ast_stmt_to_bytecode(bc, while_->body);
         /* Jump back to the condition */
         write_instruction(&bc->bytecode, OP_LI, head->line);
-        writew(&bc->bytecode, (BytecodeWord)condition_target);
+        writew(&bc->bytecode, (BytecodeWord)loop_start_offset);
         write_instruction(&bc->bytecode, OP_JMP, head->line);
         /* Patch the skip body jump */
         patchi(&bc->bytecode, end_target,
                bc->bytecode.code_offset - end_target - sizeof(BytecodeQuarter));
+
+        /* Patch any break statements for this loop */
+        u32 loop_end_offset = bc->bytecode.code_offset;
+        for (u32 i = break_i_prev; i < bc->break_i; i++) {
+            patchw(&bc->bytecode, bc->break_offsets[break_i_prev + i], loop_end_offset);
+        }
+        bc->break_i = break_i_prev;
+        bc->loop_i--;
+    } break;
+    case STMT_CONTINUE: {
+        /* Jump back to the beginning of the loop */
+        write_instruction(&bc->bytecode, OP_LI, head->line);
+        writew(&bc->bytecode, (BytecodeWord)bc->loop_offsets[bc->loop_i]);
+        write_instruction(&bc->bytecode, OP_JMP, head->line);
+    } break;
+    case STMT_BREAK: {
+        u32 break_imm = write_instruction(&bc->bytecode, OP_LI, head->line);
+        /* Temporary, patched at the end of the loop */
+        writew(&bc->bytecode, -1);
+        write_instruction(&bc->bytecode, OP_JMP, head->line);
+        bc->break_offsets[bc->break_i] = break_imm;
+        bc->break_i++;
+        if (bc->break_i > BREAK_MAX_DEPTH) {
+            LOG_FATAL_NOARG("TODO :: Max break depth exceeded");
+            exit(1);
+        }
     } break;
     case STMT_BLOCK: {
         AstBlock *block = AS_BLOCK(head);

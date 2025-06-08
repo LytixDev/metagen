@@ -74,6 +74,7 @@ typedef enum {
     OP_FUNCPRO, // push bp, set bp = sp
     OP_RET, // set sp = bp, pop as a, set bp = a, pop as b, set pc = b
     OP_EXIT, // Halt the execution
+    OP_NOP,
 
     OP_TYPE_LEN,
 } OpCode;

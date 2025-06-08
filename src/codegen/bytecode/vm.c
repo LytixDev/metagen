@@ -108,11 +108,10 @@ BytecodeWord run(Bytecode bytecode, bool debug)
     vm.instructions_executed = 0;
     // vm.flags = 0;
 
-    BytecodeWord stack_start = (BytecodeWord)vm.sp;
     while (1) {
         vm.instructions_executed++;
 
-        // printf("ip:%d sp:%d, bp:%d %s\n", vm.ip - bytecode.code, vm.sp - stack_start, vm.bp,
+        // printf("ip:%d sp:%d, bp:%d %s\n", vm.ip - bytecode.code, vm.sp - vm.ss, vm.bp,
         // op_code_str_map[*vm.ip]);
         OpCode instruction;
 
@@ -201,10 +200,10 @@ BytecodeWord run(Bytecode bytecode, bool debug)
         } break;
         case OP_FUNCPRO:
             pushw(&vm, vm.bp);
-            vm.bp = (BytecodeWord)vm.sp - stack_start;
+            vm.bp = (BytecodeWord)(vm.sp - vm.ss);
             break;
         case OP_RET:
-            vm.sp = (u8 *)(vm.bp + stack_start);
+            vm.sp = (u8 *)(vm.bp + vm.ss);
             vm.bp = popw(&vm);
             vm.pc = (u8 *)popw(&vm);
             break;
@@ -213,6 +212,8 @@ BytecodeWord run(Bytecode bytecode, bool debug)
             pushw(&vm, (BytecodeWord)vm.pc);
             vm.pc = bytecode.code + callee_offset;
         } break;
+        case OP_NOP:
+            break;
 
         case OP_EXIT:
             goto vm_loop_done;

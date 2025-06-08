@@ -1671,10 +1671,10 @@ Str8List str_list_from_split(Str8 input, char delim)
         if (i == input.len || input.str[i] == delim) {
             size_t length = i - start;
             /* Avoid pushing empty string */
-            if (length > 0) {
+            //if (length > 0) {
                 Str8 str = { .len = length, .str = input.str + start };
                 str_list_push(&list, str);
-            }
+            //}
             start = i + 1;
         }
     }
