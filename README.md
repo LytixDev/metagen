@@ -64,11 +64,13 @@ struct User {
 - [x] Frontend
 - [x] Type inference & Typecheck
 - [x] C backend
-- [ ] Bytecode backend
+- [x] Bytecode backend
 - [ ] Compile-time execution
 - [ ] AST modification at compile-time
 
 ### Language Features
+The language is just a vehicle for experimentation. Syntax and language features, beside the main experiment (that being compile-time modification of a typechecked AST), isn't really that important.
+
 | Feature | Frontend | C backend | Bytecode backend |
 |----------|----------|----------|----------|
 | If else | ✅ | ✅ | ✅  |
@@ -79,7 +81,7 @@ struct User {
 | Structs | ✅ | ⏳ | ❌ |
 | Enums | ✅ | ⏳ | ❌ |
 | Strings | ✅ | ❌ | ❌ |
-| Arrays | ✅ | ✅ | ❌ |
+| Arrays | ✅ | ✅ | ✅  |
 | Slices | ❌ | ❌ | ❌ |
 | Functions | ✅ | ✅ | ✅   |
 | Ints & Floats | ⏳ | ❌ | ❌ |

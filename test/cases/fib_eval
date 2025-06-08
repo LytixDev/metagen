@@ -8,12 +8,12 @@ end
 
 func main(): s32
 begin
-    var fib_20: s32
-
-    fib_20 := fib(20)
-    print fib_20
-
+    var fib_5: s32, fib_6: s32, fib_7: s32
+    fib_5 := @eval(fib(5))
+    fib_6 := @eval(fib(6))
+    fib_7 := fib_5 + fib_6
+    print fib_7
     return 0
 end
 --- OUTPUT ---
-6765
+13

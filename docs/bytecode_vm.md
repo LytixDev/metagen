@@ -6,21 +6,16 @@ Goals:
 - Simplicity
 - Easy to extend
 - Interop with compiler internals
-- Move most of the complexity to the bytecode generator.
+- Move most of the complexity to the bytecode compiler.
 
 ## Bytecode:
-
 
 Layout:
 - Setup code for global variables
 - Main function
 - Every other function
 
-Bytecode generator todo:
-- Fix passing args to function calls
-- Struct member padding ?
-- Struct member access (load and store)
-- Global variables
+Note that currently, every local variable is aligned to 8-byte boundary (sizeof(BytecodeWord)).
 
 
 ## VM:
@@ -31,7 +26,7 @@ The VM consits of four mutable properties:
 2. stack pointer (sp)
 3. base pointer (bp)
 4. stack
-5. flags
+5. flags (currently unused)
 
 ### Execution
 The VM executes one instruction at a time until it reaches the OP_EXIT instruction. The next instruction is determined by the ip. The ip is incremented upon reading an instruction, but can also be changed by branch and jump instructions.

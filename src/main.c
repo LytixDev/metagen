@@ -15,31 +15,32 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include <getopt.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <sys/stat.h>
 
-#include "compiler/ast.h"
-#include "compiler/codegen/gen.h"
-#include "compiler/compiler.h"
-#include "compiler/comptime/bytecode.h"
-#include "compiler/comptime/vm.h"
-#include "compiler/error.h"
-#include "compiler/parser.h"
-#include "compiler/type.h"
+#define BASE_IMPLEMENTATION
+#include "base.h"
 
-#include "base/log.h"
-#include "base/str.h"
-#define NICC_IMPLEMENTATION
-#include "base/nicc.h"
-#define SAC_IMPLEMENTATION
-#include "base/sac_single.h"
+#include "ast.h"
+#include "codegen/bytecode/gen.h"
+#include "codegen/bytecode/vm.h"
+#include "codegen/c/gen.h"
+#include "compiler.h"
+#include "error.h"
+#include "parser.h"
+#include "type.h"
 
+
+typedef enum {
+    TARGET_C = 0,
+    TARGET_BYTECODE = 1,
+} MetagenTarget;
 
 typedef struct {
     u32 log_level; /* 0: Only log erros. 1: Log warnings. 2: Log everything. */
     bool parse_only; /* Stops after parsing and prints the syntax tree */
-    bool bytecode_backend; /* Emits bytecode instead of the default C backend */
-    bool run_bytecode; /* Treat the input as bytecode and run it */
+    MetagenTarget target;
     bool debug_bytecode; /* Bytecode backend goes into debug mode */
 } MetagenOptions;
 
@@ -82,30 +83,72 @@ u32 compile(char *file_name, Str8 source)
         goto done;
     }
     if (options.parse_only) {
-        ast_print((AstNode *)ast_root, 0);
-        putchar('\n');
+        ArenaTmp tmp_arena = m_arena_tmp_init(compiler.persist_arena);
+        Str8Builder sb = make_str_builder(tmp_arena.arena);
+        ast_to_str(&sb, ast_root);
+        printf("%s\n", sb.str.str);
+        m_arena_tmp_release(tmp_arena);
         goto done;
     }
 
-    /* Middle end */
-    if (run_compiler_pass(&compiler, ast_root, typegen, "typegen")) {
-        goto done;
-    }
-    if (run_compiler_pass(&compiler, ast_root, infer, "type infer")) {
-        goto done;
-    }
-    if (run_compiler_pass(&compiler, ast_root, typecheck, "typecheck")) {
-        goto done;
-    }
+    /*
+     * TODO: Right now we redo the middle in its entirety after compile time calls .
+     *       This is wasteful as most things remain the same. It also current leaks memory.
+     *       We want to do some kind of incremental typegen, infer and typecheck.
+     */
+    bool had_to_resolve;
+    do {
+        had_to_resolve = false;
+
+        /* Middle end */
+        if (run_compiler_pass(&compiler, ast_root, typegen, "typegen")) {
+            goto done;
+        }
+        if (run_compiler_pass(&compiler, ast_root, infer, "type infer")) {
+            goto done;
+        }
+        if (run_compiler_pass(&compiler, ast_root, typecheck, "typecheck")) {
+            goto done;
+        }
+
+        /* Find unresolved comptile time calls */
+        // TODO: Figure out order
+        for (AstListNode *node = ast_root->comptime_calls.head; node != NULL; node = node->next) {
+            had_to_resolve = true;
+
+            AstCall *call = AS_CALL(node->this);
+
+            Bytecode bytecode = ast_call_to_bytecode(compiler.symt_root, ast_root, call);
+            // disassemble(bytecode, source);
+            BytecodeWord result = run(bytecode, false);
+            // TODO: Temporary assume result is an s32, turn it into a source literal
+            Str8Builder sb = make_str_builder(compiler.persist_arena);
+            str_builder_sprintf(&sb, "%d", 1, result);
+            str_builder_end(&sb, true);
+
+            // TODO: Figure out how to wrap properly
+            AstLiteral *literal = m_arena_alloc(compiler.persist_arena, sizeof(AstLiteral));
+            literal->kind = EXPR_LITERAL;
+            literal->lit_type = LIT_NUM;
+            literal->literal = sb.str;
+
+            call->is_resolved = true;
+            call->resolved_node = (AstNode *)literal;
+        }
+
+        // TEMPORARY
+        ast_root->comptime_calls.head = NULL;
+
+    } while (had_to_resolve);
 
     /* Backend */
-    if (options.bytecode_backend && options.run_bytecode) {
+    if (options.target == TARGET_BYTECODE) {
         LOG_DEBUG_NOARG("Generating bytecode");
-        Bytecode bytecode = ast_to_bytecode(compiler.symt_root, ast_root);
+        Bytecode bytecode = ast_root_to_bytecode(compiler.symt_root, ast_root);
         if (options.debug_bytecode) {
             disassemble(bytecode, source);
         }
-        //run(bytecode, options.debug_bytecode);
+        // run(bytecode, options.debug_bytecode);
         run(bytecode, false);
     } else {
         LOG_DEBUG_NOARG("Generating c-code");
@@ -136,13 +179,11 @@ int main(int argc, char *argv[])
      * option range description
      * -l     0-2   Log level
      * -p           Parse only. Prints the syntax tree.
-     * -b           Emits bytecode instead of the default C backend.
-     * -r           Treat the input as bytecode and run it. If used with -b then it runs the
-     *              bytecode directly.
+     * -t           Target. c or bytecode.
      * -d           Debug bytecode.
      */
     int opt;
-    while ((opt = getopt(argc, argv, "l:pbrd")) != -1) {
+    while ((opt = getopt(argc, argv, "l:t:pd")) != -1) {
         switch (opt) {
         case 'l': {
             int log_level = atoi(optarg);
@@ -152,14 +193,19 @@ int main(int argc, char *argv[])
             }
             options.log_level = log_level;
         } break;
+        case 't': {
+            if (strcmp(optarg, "c") == 0) {
+                options.target = TARGET_C;
+            } else if (strcmp(optarg, "bytecode") == 0) {
+                options.target = TARGET_BYTECODE;
+            } else {
+                fprintf(stderr, "Error: Unsupported target '%s'\n", optarg);
+                fprintf(stderr, "Supported targets:\n\tc\n\tbytecode\n");
+                return EXIT_FAILURE;
+            }
+        } break;
         case 'p':
             options.parse_only = true;
-            break;
-        case 'b':
-            options.bytecode_backend = true;
-            break;
-        case 'r':
-            options.run_bytecode = true;
             break;
         case 'd':
             options.debug_bytecode = true;

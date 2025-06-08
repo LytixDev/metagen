@@ -14,14 +14,14 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
-#include "base/str.h"
-#include "compiler/ast.h"
-#include "compiler/compiler.h"
-#include "compiler/error.h"
-#include "compiler/type.h"
-
 #include <stdio.h>
+
+#include "ast.h"
+#include "base.h"
+#include "compiler.h"
+#include "error.h"
+#include "type.h"
+
 
 FILE *f = NULL;
 
@@ -259,6 +259,11 @@ static void gen_expr(Compiler *compiler, AstExpr *head)
     } break;
     case EXPR_CALL: {
         AstCall *call = AS_CALL(head);
+        if (call->is_resolved) {
+            gen_expr(compiler, (AstExpr *)call->resolved_node);
+            break;
+        }
+
         fprintf(f, "%s(", call->identifier.str);
         if (call->args != NULL) {
             if ((u32)call->args->kind == (u32)EXPR_LITERAL) {
@@ -392,6 +397,9 @@ static void gen_func(Compiler *compiler, Symbol *sym)
 {
     /* Generate function head */
     TypeInfoFunc *t = (TypeInfoFunc *)sym->type_info;
+    if (t->is_comptime) {
+        return;
+    }
     Str8 return_type_name = type_info_and_identifier(compiler, t->return_type, &sym->name);
     fprintf(f, "%s(", return_type_name.str);
 

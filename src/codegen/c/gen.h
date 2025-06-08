@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2024 Nicolai Brand (https://lytix.dev)
+ *  Copyright (C) 2024-2025 Nicolai Brand (https://lytix.dev)
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -14,12 +14,11 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef GEN_H
-#define GEN_H
+#ifndef GEN_C_H
+#define GEN_C_H
 
-#include "compiler/compiler.h"
-#include "compiler/type.h"
+#include "compiler.h"
 
 void transpile_to_c(Compiler *compiler);
 
-#endif /* TYPE_H */
+#endif /* GEN_C_H */

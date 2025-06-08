@@ -17,8 +17,7 @@
 #ifndef LEX_H
 #define LEX_H
 
-#include "base/str.h"
-#include "base/types.h"
+#include "base.h"
 
 typedef struct error_handler_t ErrorHandler; // forward decl from error.h
 
@@ -56,7 +55,7 @@ typedef enum {
     // Misc..
     TOKEN_LPAREN,
     TOKEN_RPAREN,
-    TOKEN_LBRACKET,
+    TOKEN_LBRACKET, // [, used for indexing
     TOKEN_RBRACKET,
     TOKEN_DOT,
     TOKEN_COMMA,

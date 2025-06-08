@@ -1,0 +1,15 @@
+--- SOURCE ---
+var glob1: s32, glob2: s32
+
+func main(): s32
+begin
+    var local1: s32, local2: s32, local3: s32
+    glob1 := 10
+    glob2 := 20
+    local1 := 1
+    local2 := 2
+    local3 := glob1 + glob2 + local1 + local2
+    print local3 // expect 33
+end
+--- OUTPUT ---
+33

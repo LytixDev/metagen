@@ -15,7 +15,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "lex.h"
-#include "base/base.h"
+#include "base.h"
 #include "error.h"
 #include <stdio.h>
 #include <string.h>

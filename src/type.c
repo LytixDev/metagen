@@ -14,23 +14,22 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#include "type.h"
-#include "ast.h"
-#include "base/base.h"
-#include "base/nag.h"
-#include "base/nicc.h"
-#include "base/sac_single.h"
-#include "base/str.h"
-#include "compiler.h"
-#include "error.h"
-
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "ast.h"
+#include "base.h"
+#include "compiler.h"
+#include "error.h"
 
+
+TypeInfo type_unresolved_comptime_call = { .kind = TYPE_UNRESOLVED_COMPTIME_CALL };
+
+
+// TODO: fix this ugly mess
 static void *make_type_info(Arena *arena, TypeInfoKind kind, Str8 generated_by)
 {
     struct type_info_properties {
@@ -52,6 +51,9 @@ static void *make_type_info(Arena *arena, TypeInfoKind kind, Str8 generated_by)
     info->is_resolved = type_info_table[kind].resolved_by_default;
     info->kind = kind;
     info->generated_by = generated_by;
+    if (info->kind == TYPE_FUNC) {
+        ((TypeInfoFunc *)info)->is_comptime = false;
+    }
     return info;
 }
 
@@ -60,6 +62,10 @@ static bool type_info_equal(TypeInfo *a, TypeInfo *b)
     /*
      * We use name equivalence to determine if two types are the same.
      */
+
+    if (a->kind == TYPE_UNRESOLVED_COMPTIME_CALL || b->kind == TYPE_UNRESOLVED_COMPTIME_CALL) {
+        return true;
+    }
     if (a->kind != b->kind) {
         return false;
     }
@@ -301,6 +307,8 @@ static void typegen_from_func_decl(Compiler *c, AstFunc *decl)
     }
 }
 
+static void bind_stmt(Compiler *c, SymbolTable *symt_local, AstStmt *head);
+
 static void bind_expr(Compiler *c, SymbolTable *symt_local, AstExpr *head)
 {
     /* Creates and binds symbols to expressions */
@@ -335,6 +343,14 @@ static void bind_expr(Compiler *c, SymbolTable *symt_local, AstExpr *head)
     } break;
     case EXPR_CALL: {
         AstCall *call = AS_CALL(head);
+        if (call->is_resolved) {
+            if (AST_IS_STMT(call)) {
+                bind_stmt(c, symt_local, (AstStmt *)call->resolved_node);
+            } else {
+                bind_expr(c, symt_local, (AstExpr *)call->resolved_node);
+            }
+        }
+
         if (call->args == NULL) {
             break;
         }
@@ -500,6 +516,12 @@ static TypeInfo *typecheck_expr(Compiler *c, SymbolTable *symt_local, AstExpr *h
     } break;
     case EXPR_CALL: {
         AstCall *call = AS_CALL(head);
+        if (call->is_resolved) {
+            TypeInfo *resolved = typecheck_expr(c, symt_local, (AstExpr *)call->resolved_node);
+            head->type = resolved;
+            break;
+        }
+
         Symbol *sym = get_sym_by_name(symt_local, call->identifier);
         if (sym == NULL) {
             error_sym(c->e, "Function not found", call->identifier);
@@ -534,10 +556,14 @@ static TypeInfo *typecheck_expr(Compiler *c, SymbolTable *symt_local, AstExpr *h
         for (AstListNode *node = args->head; node != NULL; node = node->next) {
             TypeInfo *t_arg = typecheck_expr(c, symt_local, (AstExpr *)node->this);
             TypeInfo *t_param = callee->param_types[i];
+            i += 1;
+            /* Unresolved comptime calls */
+            if (call->is_comptime && !call->is_resolved) {
+                continue;
+            }
             if (!type_info_equal(t_arg, t_param)) {
                 error_typecheck_binary(c->e, "Argument mismatch", (AstNode *)head, t_arg, t_param);
             }
-            i += 1;
         }
         head->type = callee->return_type;
     } break;
@@ -698,6 +724,35 @@ static void fill_builtin_types(Compiler *c)
     symt_new_sym(c, &c->symt_root, SYMBOL_TYPE, name, (TypeInfo *)bool_builtin, NULL);
 }
 
+
+static void typegen_from_intrinsic_func(Compiler *c, Str8 func_name)
+{
+    TypeInfoFunc *t = make_type_info(c->persist_arena, TYPE_FUNC, func_name);
+    t->is_comptime = true;
+    t->n_params = 1;
+    t->param_names = m_arena_alloc(c->persist_arena, sizeof(Str8) * 1);
+    t->param_types = m_arena_alloc(c->persist_arena, sizeof(TypeInfo *) * 1);
+    t->info.is_resolved = true;
+    t->return_type = &type_unresolved_comptime_call;
+    symt_new_sym(c, &c->symt_root, SYMBOL_FUNC, func_name, (TypeInfo *)t, NULL);
+
+    // TODO: Typegen will be tricky here
+    //       What is the type of eval() for instance ?
+
+
+    // for (u32 i = 0; i < decl->parameters.len; i++) {
+    //     TypedIdent ident = decl->parameters.vars[i];
+    //     t->param_names[i] = ident.name;
+    //     TypeInfo *param_type = ast_type_resolve(c, ident.ast_type_info, true);
+    //     t->param_types[i] = param_type;
+    // }
+}
+
+static void fill_intrinsic_functions(Compiler *c)
+{
+    typegen_from_intrinsic_func(c, STR8_LIT("eval"));
+}
+
 static void resolve_global_types(Compiler *c)
 {
     /*
@@ -746,12 +801,27 @@ static void resolve_global_types(Compiler *c)
     }
 }
 
-void typegen(Compiler *c, AstRoot *root)
+static void typegen_init(Compiler *c)
 {
     c->symt_root = symt_init(NULL);
-
     /* Fill symbol table with builtin types */
     fill_builtin_types(c);
+    /* Fill symbol table with compiler intrinsic functions */
+    fill_intrinsic_functions(c);
+
+    /* Create the symbol for the null pointer */
+    Str8Builder sb = make_str_builder(c->persist_arena);
+    str_builder_append_cstr(&sb, "null", 4);
+    Str8 name = str_builder_end(&sb, true);
+    TypeInfoPointer *tz = make_type_info(c->persist_arena, TYPE_POINTER, name);
+    tz->info.is_resolved = true;
+    tz->pointer_to = NULL;
+    c->sym_null = symt_new_sym(c, &c->symt_root, SYMBOL_NULL_PTR, name, (TypeInfo *)tz, NULL);
+}
+
+void typegen(Compiler *c, AstRoot *root)
+{
+    typegen_init(c);
 
     /* Create symbols and types for global declarations */
     for (AstListNode *node = root->enums.head; node != NULL; node = node->next) {
@@ -839,15 +909,6 @@ void typegen(Compiler *c, AstRoot *root)
 
 void infer(Compiler *c, AstRoot *root)
 {
-    /* Create the symbol for the null pointer */
-    Str8Builder sb = make_str_builder(c->persist_arena);
-    str_builder_append_cstr(&sb, "null", 4);
-    Str8 name = str_builder_end(&sb, true);
-    TypeInfoPointer *t = make_type_info(c->persist_arena, TYPE_POINTER, name);
-    t->info.is_resolved = true;
-    t->pointer_to = NULL;
-    c->sym_null = symt_new_sym(c, &c->symt_root, SYMBOL_NULL_PTR, name, (TypeInfo *)t, NULL);
-
     /* Bind symbols */
     for (AstListNode *node = root->funcs.head; node != NULL; node = node->next) {
         bind_function(c, AS_FUNC(node->this));

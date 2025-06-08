@@ -17,8 +17,7 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
-#include "base/nicc.h"
-#include "base/sac_single.h"
+#include "base.h"
 #include "type.h"
 
 typedef struct error_handler_t ErrorHandler; // forward decl from error.h
