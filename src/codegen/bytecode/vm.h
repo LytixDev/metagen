@@ -17,7 +17,7 @@
 #ifndef VM_H
 #define VM_H
 
-#include "codegen/bytecode/gen.h"
+#include "codegen/bytecode/bytecode.h"
 
 #define STACK_MAX 1024
 
@@ -28,7 +28,7 @@ typedef enum {
 
 typedef struct {
     Bytecode b;
-    u8 *ip;
+    u8 *pc;
 
     u8 stack[STACK_MAX * 8]; // Byte-addressable stack
     u8 *sp;

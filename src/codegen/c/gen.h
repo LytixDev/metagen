@@ -14,11 +14,11 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef GEN_H
-#define GEN_H
+#ifndef GEN_C_H
+#define GEN_C_H
 
 #include "compiler.h"
 
 void transpile_to_c(Compiler *compiler);
 
-#endif /* TYPE_H */
+#endif /* GEN_C_H */

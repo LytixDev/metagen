@@ -15,34 +15,34 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "codegen/bytecode/vm.h"
-#include "codegen/bytecode/gen.h"
+#include "codegen/bytecode/bytecode.h"
 #include <assert.h>
 #include <stdio.h>
 
 
 static BytecodeWord nextw(MetagenVM *vm)
 {
-    BytecodeWord value = *(BytecodeWord *)vm->ip;
-    vm->ip += sizeof(BytecodeWord);
+    BytecodeWord value = *(BytecodeWord *)vm->pc;
+    vm->pc += sizeof(BytecodeWord);
     return value;
 }
 
-static BytecodeImm nexti(MetagenVM *vm)
+static BytecodeQuarter nextq(MetagenVM *vm)
 {
-    BytecodeImm value = *(BytecodeImm *)vm->ip;
-    vm->ip += sizeof(BytecodeImm);
+    BytecodeQuarter value = *(BytecodeQuarter *)vm->pc;
+    vm->pc += sizeof(BytecodeQuarter);
     return value;
 }
 
 static u8 next_u8(MetagenVM *vm)
 {
-    u8 value = *vm->ip;
-    vm->ip++;
+    u8 value = *vm->pc;
+    vm->pc++;
     return value;
 }
 
 /* Stack operations */
-static void pushn(MetagenVM *vm, BytecodeImm n)
+static void pushn(MetagenVM *vm, BytecodeQuarter n)
 {
     // TODO: zero init?
     vm->sp += sizeof(BytecodeWord) * n;
@@ -60,7 +60,7 @@ static BytecodeWord popw(MetagenVM *vm)
     return *(BytecodeWord *)vm->sp;
 }
 
-static BytecodeWord popn(MetagenVM *vm, BytecodeImm n)
+static BytecodeWord popn(MetagenVM *vm, BytecodeQuarter n)
 {
     vm->sp -= sizeof(BytecodeWord) * n;
     return *vm->sp;
@@ -101,7 +101,7 @@ BytecodeWord run(Bytecode bytecode, bool debug)
 {
     MetagenVM vm = { 0 };
     vm.b = bytecode;
-    vm.ip = bytecode.code;
+    vm.pc = bytecode.code;
     vm.sp = (u8 *)vm.stack;
     vm.ss = vm.sp;
     vm.bp = 0;
@@ -116,24 +116,24 @@ BytecodeWord run(Bytecode bytecode, bool debug)
         // op_code_str_map[*vm.ip]);
         OpCode instruction;
 
-        switch (instruction = *vm.ip++) {
+        switch (instruction = *vm.pc++) {
         /* Arithmetic */
-        case OP_ADDW:
+        case OP_ADD:
             pushw(&vm, popw(&vm) + popw(&vm));
             break;
-        case OP_SUBW:
+        case OP_SUB:
             pushw(&vm, popw(&vm) - popw(&vm));
             break;
-        case OP_MULW:
+        case OP_MUL:
             pushw(&vm, popw(&vm) * popw(&vm));
             break;
-        case OP_DIVW:
+        case OP_DIV:
             pushw(&vm, popw(&vm) / popw(&vm));
             break;
-        case OP_LSHIFTW:
+        case OP_LSHIFT:
             pushw(&vm, popw(&vm) << popw(&vm));
             break;
-        case OP_RSHIFTW:
+        case OP_RSHIFT:
             pushw(&vm, popw(&vm) >> popw(&vm));
             break;
         case OP_GE:
@@ -148,40 +148,40 @@ BytecodeWord run(Bytecode bytecode, bool debug)
 
         /* Jumps and branches */
         case OP_JMP:
-            vm.ip = bytecode.code + popw(&vm);
+            vm.pc = bytecode.code + popw(&vm);
             break;
         case OP_BIZ: {
-            BytecodeImm target = nexti(&vm);
+            BytecodeQuarter target = nextq(&vm);
             if (popw(&vm) == 0) {
-                vm.ip += target;
+                vm.pc += target;
             }
         } break;
         case OP_BNZ: {
-            BytecodeImm target = nexti(&vm);
+            BytecodeQuarter target = nextq(&vm);
             if (popw(&vm) != 0) {
-                vm.ip += target;
+                vm.pc += target;
             }
         } break;
 
         /* Stack manipulation */
-        case OP_CONSTANTW: {
+        case OP_LI: {
             BytecodeWord value = nextw(&vm);
             pushw(&vm, value);
         }; break;
-        case OP_PUSHNW: {
-            BytecodeImm n_words = nexti(&vm);
+        case OP_PUSHN: {
+            BytecodeQuarter n_words = nextq(&vm);
             pushn(&vm, n_words);
         } break;
-        case OP_POPNW: {
-            BytecodeImm n_words = nexti(&vm);
+        case OP_POPN: {
+            BytecodeQuarter n_words = nextq(&vm);
             popn(&vm, n_words);
         } break;
-        case OP_LDBPW: {
-            BytecodeImm bp_offset = nexti(&vm);
+        case OP_LDBP: {
+            BytecodeQuarter bp_offset = nextq(&vm);
             pushw(&vm, ldw(&vm, vm.bp + bp_offset));
         } break;
-        case OP_STBPW: {
-            BytecodeImm bp_offset = nexti(&vm);
+        case OP_STBP: {
+            BytecodeQuarter bp_offset = nextq(&vm);
             BytecodeWord value = popw(&vm);
             stw(&vm, vm.bp + bp_offset, value);
         } break;
@@ -206,12 +206,12 @@ BytecodeWord run(Bytecode bytecode, bool debug)
         case OP_RET:
             vm.sp = (u8 *)(vm.bp + stack_start);
             vm.bp = popw(&vm);
-            vm.ip = (u8 *)popw(&vm);
+            vm.pc = (u8 *)popw(&vm);
             break;
         case OP_CALL: {
             BytecodeWord callee_offset = popw(&vm);
-            pushw(&vm, (BytecodeWord)vm.ip);
-            vm.ip = bytecode.code + callee_offset;
+            pushw(&vm, (BytecodeWord)vm.pc);
+            vm.pc = bytecode.code + callee_offset;
         } break;
 
         case OP_EXIT:
