@@ -1,17 +1,27 @@
 # On compile time execution in Metagen
 
-Metagen is a language that "lets you modify a typechecked AST of the source program at compile-time." What this means and why its intersting is a topic for another day. This document will describe how Metagen achieves compile time execution of typechecked AST nodes.
+Metagen is an idea for a language and compiler that allows you to modify a typechecked AST representation of the source program during compile-time. Why this is interesting and potentially useful is a topic for another day. This document will describe 1. how Metagen plans to achieves compile time execution and 2. how to modify the AST using compile-time execution.
 
-Note that all code shown in this document is pseudo code and does not parse.
+
+NOTE: Code shown in this document is pseudo code and does not necessarily parse. Language syntax and language features, apart from compile-time execution and AST modification, is not of particular importance.
+NOTE: This document is not finished and continuially under development as the experimentation progresses.
 
 ## Idea
+>A bit of background, feel free to skip
 
-Many languages, like C, have textual macros: text in -> text out. Some languages, like Rust, support macros directly on the AST.
+I like C. C supports textual macros through the preprocessor: text in -> text out. A simple scan through this repo will show that macros can be super useful.
+
+A more powerful kind of macro works on a higher level of abstraction. Namely on the AST-level. AST in -> AST out. Some languages, like Rust (and a few more) support thiskind of macro.  
+
+...
+
+Again, why these kinds of macros are useful and interesting is not covered here. Providing no motivation for the topic, how boring of me!
+
+...
 
 Like Rust procedural macros, Metagen compile time functions takes an AST node as input and produces an AST node as output. The AST nodes that Metagen compile time functions operate on is fully typechecked. Furthermore, these compile time functions are written exactly the same as any other function. This way we get meta-programming baked directly into the language - no macros needed.
 
 Below are a few examples that illustrates this idea.
-
 
 ### GenEnumNames
 Whenever I define an enum in C, I nearly always create a corresponding list of its names to help with debugging. This approach is error prone as every time I add a new enum member, remove one, or switch the order, I need to remember to update the accompanying list of names. The GenEnumNames function does this automatically.
@@ -24,8 +34,8 @@ enum Fruit {
     DRAGON_FRUIT,
 }
 
-// creates the array ["APPLE", "BANANA", "PEAR", "DRAGON_FRUIT" ]
-fruit_names = @GenEnumNames(Fruit)
+// creates the array ["APPLE", "BANANA", "PEAR", "DRAGON_FRUIT"]
+fruit_names := @GenEnumNames(Fruit)
 ```
 The '@'-sign is syntax to call the function GenEnumNames at compile time. GenEnumNames is a function which has an AST node as its first and only argument. It has one return value which is a new AST node.
 
@@ -41,7 +51,7 @@ func GenEnumNames(enum_type: AstLiteral) -> AstLiteral
         // Error: Expected a type, but got ... instead
     }
 
-    array_literal: AstLiteral
+    array_literal: AstLiteral = make_array_literal(...)
     array_literal.lit_type = LIT_ARRAY
 
     for each member of enum_type.type
@@ -54,7 +64,7 @@ func GenEnumNames(enum_type: AstLiteral) -> AstLiteral
 
 
 ### Parallel
-What if we could get parallelisation with very little effort? In c and c++ we can use OpenMP, which from my pov is a compiler extension that nicely wraps pthreads for you (alltough its quite a lot more).
+What if we could get parallelisation with very little effort? In C and C++ we can use OpenMP, which from my pov is a compiler extension that nicely wraps pthreads for you (although I'm told its quite a lot more).
 
 ```
 @@Parallel(4)

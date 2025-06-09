@@ -120,7 +120,7 @@ u32 compile(char *file_name, Str8 source)
 
             Bytecode bytecode = ast_call_to_bytecode(compiler.symt_root, ast_root, call);
             // disassemble(bytecode, source);
-            BytecodeWord result = run(bytecode, false);
+            BytecodeWord result = run(&bytecode, false);
             // TODO: Temporary assume result is an s32, turn it into a source literal
             Str8Builder sb = make_str_builder(compiler.persist_arena);
             str_builder_sprintf(&sb, "%d", 1, result);
@@ -148,8 +148,7 @@ u32 compile(char *file_name, Str8 source)
         if (options.debug_bytecode) {
             disassemble(bytecode, source);
         }
-        // run(bytecode, options.debug_bytecode);
-        run(bytecode, false);
+        run(&bytecode, false);
     } else {
         LOG_DEBUG_NOARG("Generating c-code");
         transpile_to_c(&compiler);
