@@ -22,6 +22,9 @@
 
 typedef struct compiler_t Compiler; // forward decl from compiler.h
 
+// TODO: Natural slice type? Length and a pointer. 
+//       Also, currently we represent a string as a struct with a length and a pointer, similar 
+//       to Str8.
 typedef enum {
     TYPE_INTEGER = 0,
     TYPE_BOOL,

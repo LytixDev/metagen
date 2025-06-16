@@ -171,6 +171,21 @@ done:
     return e.n_errors;
 }
 
+static void print_help(void)
+{
+    printf("Usage: program [options] <input_file>\n");
+    printf("Options:\n");
+    printf("  -l <level>     Set log level (0-2).\n");
+    printf("                 0 = Errors only\n");
+    printf("                 1 = Warnings and errors\n");
+    printf("                 2 = Info, warnings, and errors\n");
+    printf("  -p             Parse only. Prints the syntax tree and exits.\n");
+    printf("  -t <target>    Target output. Supported targers:\n");
+    printf("                   c\n");
+    printf("                   bytecode\n");
+    printf("  -d             Debug bytecode output.\n");
+}
+
 int main(int argc, char *argv[])
 {
     /*
@@ -211,6 +226,7 @@ int main(int argc, char *argv[])
             break;
         case '?':
             fprintf(stderr, "Error: Bad usage.\n");
+            print_help();
             return EXIT_FAILURE;
         }
     }
