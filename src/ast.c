@@ -276,7 +276,6 @@ static void ast_node_to_str(Str8Builder *sb, AstNode *head, u32 indent)
             case LIT_NULL:
                 break;
             }
-            str_builder_append_str8(sb, lit->literal);
         } break;
         case EXPR_CALL: {
             AstCall *call = AS_CALL(head);

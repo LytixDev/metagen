@@ -10,7 +10,7 @@ Goals:
 
 ## Bytecode:
 
-Code layout:
+Layout:
 - Setup code for global variables
 - Main function
 - Every other function
