@@ -27,7 +27,7 @@ typedef enum {
 } VMFlags;
 
 typedef struct {
-    Bytecode b;
+    Bytecode *b;
     u8 *pc;
 
     u8 stack[STACK_MAX * 8]; // Byte-addressable stack
@@ -41,6 +41,6 @@ typedef struct {
 } MetagenVM;
 
 
-BytecodeWord run(Bytecode bytecode, bool debug);
+BytecodeWord run(Bytecode *bytecode, bool debug);
 
 #endif /* VM_H */

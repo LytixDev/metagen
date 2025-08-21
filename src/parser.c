@@ -252,6 +252,7 @@ static AstExpr *parse_primary(Parser *parser)
         ast_list_push_back(&comptime_calls, call_node);
         return (AstExpr *)call;
     }
+    case TOKEN_STR:
     case TOKEN_NUM:
     case TOKEN_IDENTIFIER: {
         Token next = peek_token(parser);

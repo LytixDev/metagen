@@ -87,8 +87,8 @@ static void dump_stack(MetagenVM vm, OpCode instruction)
         if ((i + 1) % 8 == 0) {
             u8 *chunk = &vm.stack[i - 7]; // Start of this 8-byte block
             s64 as_s64 = *(s64 *)chunk;
-            s32 low = *(s32 *)chunk;
-            s32 high = *(s32 *)(chunk + 4);
+            // s32 low = *(s32 *)chunk;
+            // s32 high = *(s32 *)(chunk + 4);
             // printf(" | s64: %lld | s32s: %d, %d", (long long)as_s64, low, high);
             printf("%d: %lld", i / 8, (long long)as_s64);
             printf("\n");
@@ -97,11 +97,11 @@ static void dump_stack(MetagenVM vm, OpCode instruction)
     printf("\n");
 }
 
-BytecodeWord run(Bytecode bytecode, bool debug)
+BytecodeWord run(Bytecode *bytecode, bool debug)
 {
-    MetagenVM vm = { 0 };
+    MetagenVM vm;
     vm.b = bytecode;
-    vm.pc = bytecode.code;
+    vm.pc = bytecode->code;
     vm.sp = (u8 *)vm.stack;
     vm.ss = vm.sp;
     vm.bp = 0;
@@ -147,7 +147,7 @@ BytecodeWord run(Bytecode bytecode, bool debug)
 
         /* Jumps and branches */
         case OP_JMP:
-            vm.pc = bytecode.code + popw(&vm);
+            vm.pc = bytecode->code + popw(&vm);
             break;
         case OP_BIZ: {
             BytecodeQuarter target = nextq(&vm);
@@ -230,7 +230,7 @@ BytecodeWord run(Bytecode bytecode, bool debug)
         case OP_CALL: {
             BytecodeWord callee_offset = popw(&vm);
             pushw(&vm, (BytecodeWord)vm.pc);
-            vm.pc = bytecode.code + callee_offset;
+            vm.pc = bytecode->code + callee_offset;
         } break;
         case OP_NOP:
             break;

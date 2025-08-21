@@ -120,7 +120,7 @@ u32 compile(char *file_name, Str8 source)
 
             Bytecode bytecode = ast_call_to_bytecode(compiler.symt_root, ast_root, call);
             // disassemble(bytecode, source);
-            BytecodeWord result = run(bytecode, false);
+            BytecodeWord result = run(&bytecode, false);
             // TODO: Temporary assume result is an s32, turn it into a source literal
             Str8Builder sb = make_str_builder(compiler.persist_arena);
             str_builder_sprintf(&sb, "%d", 1, result);
@@ -148,8 +148,7 @@ u32 compile(char *file_name, Str8 source)
         if (options.debug_bytecode) {
             disassemble(bytecode, source);
         }
-        // run(bytecode, options.debug_bytecode);
-        run(bytecode, false);
+        run(&bytecode, false);
     } else {
         LOG_DEBUG_NOARG("Generating c-code");
         transpile_to_c(&compiler);
@@ -170,6 +169,21 @@ done:
     m_arena_release(&persist_arena);
     m_arena_release(&lex_arena);
     return e.n_errors;
+}
+
+static void print_help(void)
+{
+    printf("Usage: program [options] <input_file>\n");
+    printf("Options:\n");
+    printf("  -l <level>     Set log level (0-2).\n");
+    printf("                 0 = Errors only\n");
+    printf("                 1 = Warnings and errors\n");
+    printf("                 2 = Info, warnings, and errors\n");
+    printf("  -p             Parse only. Prints the syntax tree and exits.\n");
+    printf("  -t <target>    Target output. Supported targers:\n");
+    printf("                   c\n");
+    printf("                   bytecode\n");
+    printf("  -d             Debug bytecode output.\n");
 }
 
 int main(int argc, char *argv[])
@@ -212,6 +226,7 @@ int main(int argc, char *argv[])
             break;
         case '?':
             fprintf(stderr, "Error: Bad usage.\n");
+            print_help();
             return EXIT_FAILURE;
         }
     }

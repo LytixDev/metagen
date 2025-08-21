@@ -506,13 +506,29 @@ static TypeInfo *typecheck_expr(Compiler *c, SymbolTable *symt_local, AstExpr *h
     } break;
     case EXPR_LITERAL: {
         AstLiteral *lit = AS_LITERAL(head);
-        if (lit->lit_type == LIT_IDENT || lit->lit_type == LIT_NULL) {
+        Symbol *sym;
+        switch (lit->lit_type) {
+        case LIT_IDENT:
+        case LIT_NULL:
             head->type = lit->sym->type_info;
-        } else {
-            // TODO: temporary assumption that every constant literal that is not an ident is a s32
-            Symbol *sym = get_sym_by_name(symt_local, (Str8){ .len = 3, .str = (u8 *)"s32" });
+            break;
+        case LIT_NUM:
+            // TODO: temporary assumption that every constant number that is an a s32
+            sym = get_sym_by_name(symt_local, STR8_LIT("s32"));
             head->type = sym->type_info;
+            break;
+        case LIT_STR:
+            sym = get_sym_by_name(symt_local, STR8_LIT("str"));
+            head->type = sym->type_info;
+            break;
         }
+        // if (lit->lit_type == LIT_IDENT || lit->lit_type == LIT_NULL) {
+        //     head->type = lit->sym->type_info;
+        // } else {
+        //     // TODO: temporary assumption that every constant literal that is not an ident is a s32
+        //     Symbol *sym = get_sym_by_name(symt_local, (Str8){ .len = 3, .str = (u8 *)"s32" });
+        //     head->type = sym->type_info;
+        // }
     } break;
     case EXPR_CALL: {
         AstCall *call = AS_CALL(head);
@@ -706,11 +722,11 @@ static void add_builtin_integral_type(Compiler *c, bool is_signed, u32 bit_size)
 static void fill_builtin_types(Compiler *c)
 {
     /* Integers */
-    // add_builtin_integral_type(c, true, 8);
+    //add_builtin_integral_type(c, true, 8);
     // add_builtin_integral_type(c, true, 16);
     add_builtin_integral_type(c, true, 32);
     // add_builtin_integral_type(c, true, 64);
-    // add_builtin_integral_type(c, false, 8);
+    add_builtin_integral_type(c, false, 8);
     // add_builtin_integral_type(c, false, 16);
     // add_builtin_integral_type(c, false, 32);
     // add_builtin_integral_type(c, false, 64);
@@ -723,7 +739,6 @@ static void fill_builtin_types(Compiler *c)
     bool_builtin->info.is_resolved = true;
     symt_new_sym(c, &c->symt_root, SYMBOL_TYPE, name, (TypeInfo *)bool_builtin, NULL);
 }
-
 
 static void typegen_from_intrinsic_func(Compiler *c, Str8 func_name)
 {

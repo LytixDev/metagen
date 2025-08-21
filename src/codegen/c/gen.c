@@ -44,8 +44,13 @@ static void write_base(void)
                  "typedef uint32_t u32;\n"
                  "typedef uint64_t u64;\n"
                  "typedef float f32;\n"
-                 "typedef double f64;\n";
-
+                 "typedef double f64;\n"
+                 "\n"
+                 "#define STR_LIT(literal)                    \\\n"
+                 "    (str)                                   \\\n"
+                 "    {                                       \\\n"
+                 "        (u8 *)literal, sizeof(literal) - 1  \\\n"
+                 "    }";
     fprintf(f, "%s", base);
 }
 
@@ -105,6 +110,11 @@ static u8 type_info_to_printf_format(TypeInfo *t)
     case TYPE_BOOL:
     case TYPE_INTEGER:
         return 'd';
+    case TYPE_STRUCT: {
+        if (strcmp(t->generated_by.str, "str") == 0) {
+            return 's';
+        }
+    }
     default:
         return '?';
     }
@@ -242,9 +252,14 @@ static void gen_expr(Compiler *compiler, AstExpr *head)
     } break;
     case EXPR_LITERAL: {
         AstLiteral *lit = AS_LITERAL(head);
-        if (lit->lit_type == LIT_NULL) {
-            fprintf(f, "NULL");
-        } else if (lit->lit_type == LIT_NUM) {
+        switch (lit->lit_type) {
+        case LIT_STR:
+            fprintf(f, "STR_LIT(\"%s\")", lit->literal.str);
+            break;
+        case LIT_IDENT:
+            fprintf(f, "%s", lit->literal.str);
+            break;
+        case LIT_NUM: {
             bool success;
             u32 num = str_view_to_u32(lit->literal, &success);
             if (!success) {
@@ -253,9 +268,26 @@ static void gen_expr(Compiler *compiler, AstExpr *head)
             } else {
                 fprintf(f, "%d", num);
             }
-        } else {
-            fprintf(f, "%s", lit->literal.str);
+        } break;
+        case LIT_NULL:
+            fprintf(f, "NULL");
+            break;
         }
+
+        // if (lit->lit_type == LIT_NULL) {
+        //     fprintf(f, "NULL");
+        // } else if (lit->lit_type == LIT_NUM) {
+        //     bool success;
+        //     u32 num = str_view_to_u32(lit->literal, &success);
+        //     if (!success) {
+        //         error_node(compiler->e, "Could not convert number literal to u32", (AstNode *)head);
+        //         fprintf(f, "RIP");
+        //     } else {
+        //         fprintf(f, "%d", num);
+        //     }
+        // } else {
+        //     fprintf(f, "%s", lit->literal.str);
+        // }
     } break;
     case EXPR_CALL: {
         AstCall *call = AS_CALL(head);

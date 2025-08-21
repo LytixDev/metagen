@@ -265,14 +265,24 @@ static void ast_node_to_str(Str8Builder *sb, AstNode *head, u32 indent)
         } break;
         case EXPR_LITERAL: {
             AstLiteral *lit = AS_LITERAL(head);
-            str_builder_append_str8(sb, lit->literal);
+            switch (lit->lit_type) {
+            case LIT_STR:
+                str_builder_append_str8(sb, STR8_LIT("(str) "));
+                break;
+            case LIT_NUM:
+                str_builder_append_str8(sb, STR8_LIT("(num) "));
+                break;
+            case LIT_IDENT:
+            case LIT_NULL:
+                break;
+            }
         } break;
         case EXPR_CALL: {
             AstCall *call = AS_CALL(head);
             if (call->is_comptime) {
                 str_builder_append_u8(sb, '@');
             }
-            str_builder_sprintf(sb, "\"%s\"", 1, call->identifier.str);
+            str_builder_sprintf(sb, "%s", 1, call->identifier.str);
             if (call->args) {
                 ast_node_to_str(sb, (AstNode *)call->args, indent + 1);
             }
@@ -342,7 +352,7 @@ static void ast_node_to_str(Str8Builder *sb, AstNode *head, u32 indent)
             if (func_decl->body == NULL) {
                 str_builder_append_str8(sb, STR8_LIT("compiler internal "));
             }
-            str_builder_sprintf(sb, "\"%s\"", 1, func_decl->name.str);
+            str_builder_sprintf(sb, "%s", 1, func_decl->name.str);
             str_builder_append_str8(sb, STR8_LIT(" params="));
             ast_print_typed_var_list(sb, func_decl->parameters);
             if (func_decl->body != NULL) {

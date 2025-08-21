@@ -15,21 +15,20 @@ Layout:
 - Main function
 - Every other function
 
-Note that currently, every local variable is aligned to 8-byte boundary (sizeof(BytecodeWord)).
+NOTE: The VM currently only supports load and stores in 8-byte chunks (sizeof(BytecodeWord)). Therefore, every variable is aligned to the 8-byte boundary.
 
 
 ## VM:
 The VM executes bytecode.
 
 The VM consits of four mutable properties:
-1. instruction pointer (ip)
+1. instruction pointer / program counter (pc)
 2. stack pointer (sp)
 3. base pointer (bp)
 4. stack
-5. flags (currently unused)
 
 ### Execution
-The VM executes one instruction at a time until it reaches the OP_EXIT instruction. The next instruction is determined by the ip. The ip is incremented upon reading an instruction, but can also be changed by branch and jump instructions.
+The VM executes one instruction at a time until it reaches the OP_EXIT instruction. The next instruction is determined by the pc. The pc is incremented upon reading an instruction, but can also be changed by branch and jump instructions.
 
 ### Function Prologue and Epilogue
 
