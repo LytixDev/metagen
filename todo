@@ -1,0 +1,107 @@
+v2:
+
+Start from scratch. Redo the AST. It should be one fat struct with all the fields we need and a dynamic array of children. It should output a dot file for viz (important!). It should also be a clean representation so that we can describe transformations declaratively. It should also neetly track the source code it came from. Then, change the syntax and make the necessary parsing and lexing changes. It should be a C-like syntax. The bytecode should also be changed and tought through more  carefully. The bytecode compiler should also use labels and be a two-stage compiler?. The current patch-style feels a bit inflexible.
+
+
+
+
+
+
+==== OLD ====
+
+
+- compile time execution (cte)
+
+eval keyword
+- lex and parse
+- typecheck
+
+: 
+- unary statment, takes in an expression
+- takes the expression, generates its bytecode, runs it, 
+- takes the output and wraps in a literal node
+
+
+
+// Eval is temporary
+// later on it should be
+
+
+
+func fib(n: s32): s32
+begin
+    if n = 0 then return 0
+    if n = 1 then return 1
+    return fib(n - 1) + fib(n - 2)
+end
+
+
+func main(): s32
+begin
+    var fib_20: s32
+
+    fib_20 := @eval(fib(20))
+    
+    print fib_20
+
+    return 0
+end
+
+
+// call, compile time call
+// register it as a compile time call
+
+
+Typechecking compile time calls:
+1. Has to be done in isolation
+
+
+pseudocode:
+eval(node)
+    s64 result = bytecode.run_node(node)
+    AstLiteral lit
+    lit.type = node.type
+    lit.value = result
+    return lit
+
+
+
+fib_20 := @eval(fib(20))
+
+typegen :: register eval
+infer -> compile time calls has to be delayed, but its parameters will be
+typecheck -> compile time calls has to be delayed, but its parameters will be
+
+-> find unresolved compile time calls
+-> run them, remove them list of unresolved calls
+go back to infer and typecheck
+now call points to new node, so have the infer and typecheck now that? typegen as well?
+
+note: recursion not allowed
+
+
+
+
+backlog:
+    bytecode:
+    - arrays
+
+
+    features:
+    - assert keyword?
+
+    Tests for:
+    - structs, enums, ...
+    - combininag bunch of things
+
+
+
+---------------------------------------------------------------------------------------------------
+28.08.25 - Bytecode assembler
+STATUS :: Proposal
+
+The bytecode should have a textual format and an assembler. Pros: Easier to debug, easier to 
+generate. Cons: Will take more execution time.
+
+
+
