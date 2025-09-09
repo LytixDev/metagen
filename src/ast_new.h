@@ -65,7 +65,7 @@ typedef enum {
     AST_STRUCT,
     AST_ENUM,
 
-    //AST_ROOT,
+    AST_ROOT,
 
     AST_NODE_COUNT,
 } AstKind;
@@ -73,11 +73,14 @@ typedef enum {
 typedef struct ast_node_t AstNode;
 
 /* Payload for expressions and statements */
-typedef struct {
-    AstNode **nodes;
-    u32 len;
-    u32 cap;
-} AstList;
+//typedef struct {
+//    AstNode **nodes;
+//    u32 len;
+//    u32 cap;
+//} AstList;
+
+typedef ArrayList AstList;
+
 
 typedef struct {
     TokenKind op; AstNode *expr;
@@ -171,7 +174,7 @@ struct ast_node_t {
 };
 
 typedef struct {
-    //AstKind kind;
+    AstKind kind;
 
     AstList global_variables;
     AstList global_functions;

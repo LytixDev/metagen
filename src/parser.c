@@ -22,7 +22,7 @@
 #include "lex.h"
 #include "parser.h"
 
-TokenKind token_precedences[TOKEN_TYPE_ENUM_COUNT] = {
+TokenKind operator_precedence[TOKEN_TYPE_ENUM_COUNT] = {
     0, // TOKEN_ERR,
     0, // TOKEN_NUM,
     0, // TOKEN_STR,
@@ -285,7 +285,7 @@ static AstExpr *parse_increasing_precedence(Parser *parser, AstExpr *left, u32 p
     if (!is_bin_op(next))
         return left;
 
-    u32 next_precedence = token_precedences[next.kind];
+    u32 next_precedence = operator_precedence[next.kind];
     if (precedence >= next_precedence)
         return left;
 

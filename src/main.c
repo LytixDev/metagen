@@ -22,13 +22,13 @@
 #define BASE_IMPLEMENTATION
 #include "base.h"
 
-#include "ast.h"
+#include "ast_new.h"
 // #include "codegen/bytecode/gen.h"
 // #include "codegen/bytecode/vm.h"
 // #include "codegen/c/gen.h"
 #include "compiler.h"
 #include "error.h"
-#include "parser.h"
+#include "parser_new.h"
 #include "type.h"
 
 
@@ -65,8 +65,6 @@ u32 compile_file(char *file_name, Str8 source_code)
 
     /* Data which should persist throughout the lifetime of the compiler */
     Arena persist_arena;
-    /* Arena for holding the syntax tree nodes */
-    Arena ast_arena;
     /* Data which that needs to persist for the lifetime of a compiler pass */
     Arena pass_arena;
     m_arena_init_dynamic(&persist_arena, 2, 512);
@@ -82,10 +80,7 @@ u32 compile_file(char *file_name, Str8 source_code)
     // which is just a view into the arena?
     ArrayList tokens = lex_all(&persist_arena, &e, (char *)source_code.str);
 
-    for (size_t i = 0; i < tokens.size; i++) {
-        Token *t = arraylist_get(&tokens, i);
-        token_print(*t);
-    }
+    AstRoot *root = parse(&persist_arena, tokens, &e);
 
     // Parse tokens -> ast
     

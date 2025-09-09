@@ -17,7 +17,7 @@
 #ifndef TYPE_H
 #define TYPE_H
 
-#include "ast.h"
+//#include "ast.h"
 #include "base.h"
 
 typedef struct compiler_t Compiler; // forward decl from compiler.h
@@ -60,7 +60,7 @@ typedef struct {
     u32 offset;
     union {
         TypeInfo *type;
-        AstTypeInfo ast_type_info; // Used for resolution of the type
+        //AstTypeInfo ast_type_info; // Used for resolution of the type
     };
 } TypeInfoStructMember;
 
@@ -132,7 +132,7 @@ struct symbol_t {
     u32 seq_no; // Sequence number in the symbol table this symbol belongs to
     Str8 name;
     TypeInfo *type_info; // @NULLABLE
-    AstNode *node; // @NULLABLE. Node which defined this symbol. If NULL then defined by compiler
+    //AstNode *node; // @NULLABLE. Node which defined this symbol. If NULL then defined by compiler
     union {
         SymbolTable symt_local; // FUNC and TYPE (structs and enums) create local symbol tables
         // u32 local_var_offset; //
@@ -144,8 +144,8 @@ u32 type_info_bit_size(TypeInfo *type_info);
 u32 type_info_byte_size(TypeInfo *type_info); // Rounds up
 Symbol *get_sym_by_name(SymbolTable *symt, Str8 key);
 
-void typegen(Compiler *c, AstRoot *root);
-void infer(Compiler *c, AstRoot *root);
-void typecheck(Compiler *compiler, AstRoot *root);
+// void typegen(Compiler *c, AstRoot *root);
+// void infer(Compiler *c, AstRoot *root);
+// void typecheck(Compiler *compiler, AstRoot *root);
 
 #endif /* TYPE_H */

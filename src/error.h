@@ -17,7 +17,7 @@
 #ifndef ERROR_H
 #define ERROR_H
 
-#include "ast.h"
+//#include "ast.h"
 #include "base.h"
 #include "lex.h"
 #include "type.h"
@@ -49,9 +49,9 @@ void error_handler_reset(ErrorHandler *e);
 void error_msg_str8(ErrorHandler *e, Str8 msg);
 void error_lex(ErrorHandler *e, char *msg, Location start, Location end);
 void error_parse(ErrorHandler *e, char *msg, Token guilty);
-void error_node(ErrorHandler *e, char *msg, AstNode *guilty);
+//void error_node(ErrorHandler *e, char *msg, AstNode *guilty);
 void error_sym(ErrorHandler *e, char *msg, Str8 sym_name);
-void error_typecheck_binary(ErrorHandler *e, char *msg, AstNode *guilty, TypeInfo *l, TypeInfo *r);
+//void error_typecheck_binary(ErrorHandler *e, char *msg, AstNode *guilty, TypeInfo *l, TypeInfo *r);
 // void error_type_unresolved(ErrorHandler *e, Str8List list, char *msg, Str8 type_name);
 
 #endif /* ERROR_H */
