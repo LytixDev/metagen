@@ -137,8 +137,8 @@ void lex_init(Lexer *lexer, ErrorHandler *e, char *input)
         .input = input,
         .pos_start = 0,
         .pos_current = 0,
-        .start = (Point){ 0 },
-        .current = (Point){ 0 },
+        .start = (Location){ 0 },
+        .current = (Location){ 0 },
         .e = e,
     };
 }
@@ -201,7 +201,10 @@ Token lex_next(Arena *arena, Lexer *lexer)
     case '[':
         return emit(lexer, TOKEN_LBRACKET);
     case ']':
-        return emit(lexer, TOKEN_RBRACKET);
+    case '{':
+        return emit(lexer, TOKEN_LBRACE);
+    case '}':
+        return emit(lexer, TOKEN_RBRACE);
     case '=':
         return emit(lexer, TOKEN_EQ);
     case '.':
@@ -214,6 +217,8 @@ Token lex_next(Arena *arena, Lexer *lexer)
         return emit(lexer, TOKEN_CARET);
     case '@':
         return emit(lexer, TOKEN_AT);
+    case ';':
+        return emit(lexer, TOKEN_SEMICOLON);
 
     /* Single- or two-character tokens */
     case '<':
@@ -243,6 +248,22 @@ Token lex_next(Arena *arena, Lexer *lexer)
         return lex_ident(arena, lexer);
     }
     }
+}
+
+ArrayList lex_all(Arena *arena, ErrorHandler *e, char *source_code)
+{
+    Lexer lexer;
+    lex_init(&lexer, e, source_code);
+    ArrayList tokens;
+    arraylist_init(&tokens, sizeof(Token));
+
+    Token t;
+    do {
+        t = lex_next(arena, &lexer);
+        arraylist_append(&tokens, &t);
+    } while (t.kind != TOKEN_EOF && t.kind != TOKEN_ERR);
+
+    return tokens;
 }
 
 static Token lex_ident(Arena *arena, Lexer *lexer)
@@ -342,7 +363,7 @@ static Token lex_comment(Arena *arena, Lexer *lexer)
 char *token_type_str_map[TOKEN_TYPE_ENUM_COUNT] = {
     "ERR",    "NUM",        "STR",      "COLON",  "ASSIGNMENT", "PLUS",      "MINUS",   "STAR",
     "SLASH",  "LSHIFT",     "RSHIFT",   "EQ",     "NEQ",        "LESS",      "GREATER", "LPAREN",
-    "RPAREN", "LBRACKET",   "RBRACKET", "DOT",    "COMMA",      "AMPERSAND", "CARET",   "AT",
+    "RPAREN", "LBRACKET",   "RBRACKET", "LBRACE", "RBRACE", "DOT",    "COMMA",      "AMPERSAND", "CARET",   "AT", "SEMICOLON",
     "EOF",    "IDENTIFIER", "FUNC",     "STRUCT", "ENUM",       "BEGIN",     "END",     "RETURN",
     "PRINT",  "BREAK",      "CONTINUE", "IF",     "THEN",       "ELSE",      "WHILE",   "DO",
     "VAR",    "NULL",       "COMPILER",

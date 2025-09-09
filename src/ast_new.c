@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2024 Nicolai Brand (https://lytix.dev)
+ *  Copyright (C) 2023-2025 Nicolai Brand (https://lytix.dev)
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -14,24 +14,16 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef COMPILER_H
-#define COMPILER_H
 
 #include "base.h"
-#include "type.h"
+#include "ast_new.h"
 
-typedef struct error_handler_t ErrorHandler; // forward decl from error.h
-
-typedef struct compiler_t {
-    Arena *pass_arena; // Temporary data which only persist for the duration of a single pass.
-    Arena *persist_arena;
-    ErrorHandler *e;
-
-    SymbolTable symt_root;
-    Symbol *sym_null; // The null pointer constant
-
-    ArrayList all_types; // Holds TypeInfo **. Every base type lives here.
-    ArrayList struct_types; // Holds TypeInfoStruct **
-} Compiler;
-
-#endif /* COMPILER_H */
+// NOTE: Right now we allocate based on the max possible size an ast node can take.
+//       A different approach that would use less memory is to allocate based on the memory 
+//       the node actually needs.
+AstNode *alloc_ast_node(Arena *arena, AstKind kind)
+{
+    AstNode *node = m_arena_alloc(arena, sizeof(AstNode));
+    node->kind = kind;
+    return node;
+}

@@ -64,7 +64,7 @@ void error_msg_str8(ErrorHandler *e, Str8 msg)
     append_err(e, msg);
 }
 
-void error_lex(ErrorHandler *e, char *msg, Point start, Point end)
+void error_lex(ErrorHandler *e, char *msg, Location start, Location end)
 {
     (void)start;
     Str8Builder sb = make_str_builder(&e->arena);

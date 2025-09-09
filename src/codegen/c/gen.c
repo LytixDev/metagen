@@ -111,9 +111,10 @@ static u8 type_info_to_printf_format(TypeInfo *t)
     case TYPE_INTEGER:
         return 'd';
     case TYPE_STRUCT: {
-        if (strcmp(t->generated_by.str, "str") == 0) {
+        if (strcmp((const char *)t->generated_by.str, "str") == 0) {
             return 's';
         }
+        /* fallt hrough */
     }
     default:
         return '?';

@@ -24,7 +24,9 @@ typedef struct error_handler_t ErrorHandler; // forward decl from error.h
 typedef struct {
     u32 l; // Line
     u32 c; // Column
-} Point;
+    u32 len;
+    u32 offset_in_file;
+} Location;
 
 typedef enum {
     TOKEN_ERR = 0,
@@ -57,11 +59,14 @@ typedef enum {
     TOKEN_RPAREN,
     TOKEN_LBRACKET, // [, used for indexing
     TOKEN_RBRACKET,
+    TOKEN_LBRACE,
+    TOKEN_RBRACE,
     TOKEN_DOT,
     TOKEN_COMMA,
     TOKEN_AMPERSAND, // &
     TOKEN_CARET, // ^
     TOKEN_AT, // @
+    TOKEN_SEMICOLON,
     TOKEN_EOF,
 
     // Identifier and reserved words
@@ -89,25 +94,34 @@ typedef enum {
 
 typedef struct {
     TokenKind kind;
-    Point start;
-    Point end;
+    Location start;
+    Location end;
     Str8View lexeme; // For identifiers and strings, these are actually arena allocated Str8's
 } Token;
+
+typedef struct {
+    Arena arena;
+    HashMap strings;
+    ArrayList lookup;
+} StringIntern;
 
 typedef struct lexer_t {
     ErrorHandler *e;
     char *input; // The input string being scanned.
     u32 pos_start;
     u32 pos_current;
-    Point start; // Start point of the current token being processed
-    Point current; // Current point in the input
+    Location start; // Start point of the current token being processed
+    Location current; // Current point in the input
     // NOTE: If we want to store more than one next token we could use a ring buffer
     bool has_next;
     Token next;
+
+    StringIntern intern;
 } Lexer;
 
 
 void lex_init(Lexer *lexer, ErrorHandler *e, char *input);
+ArrayList lex_all(Arena *arena, ErrorHandler *e, char *source_code);
 Token lex_next(Arena *arena, Lexer *lexer);
 Token lex_peek(Arena *arena, Lexer *lexer);
 

@@ -47,7 +47,7 @@ void error_handler_release(ErrorHandler *e);
 void error_handler_reset(ErrorHandler *e);
 
 void error_msg_str8(ErrorHandler *e, Str8 msg);
-void error_lex(ErrorHandler *e, char *msg, Point start, Point end);
+void error_lex(ErrorHandler *e, char *msg, Location start, Location end);
 void error_parse(ErrorHandler *e, char *msg, Token guilty);
 void error_node(ErrorHandler *e, char *msg, AstNode *guilty);
 void error_sym(ErrorHandler *e, char *msg, Str8 sym_name);

@@ -2,6 +2,12 @@ v2:
 
 Start from scratch. Redo the AST. It should be one fat struct with all the fields we need and a dynamic array of children. It should output a dot file for viz (important!). It should also be a clean representation so that we can describe transformations declaratively. It should also neetly track the source code it came from. Then, change the syntax and make the necessary parsing and lexing changes. It should be a C-like syntax. The bytecode should also be changed and tought through more  carefully. The bytecode compiler should also use labels and be a two-stage compiler?. The current patch-style feels a bit inflexible.
 
+Concrete goals:
+- New parser for C-like syntax
+- Improved AST format
+- Ast supports visualization through exporting to dot-format
+- Amazing source-code location info
+
 
 
 

@@ -23,9 +23,9 @@
 #include "base.h"
 
 #include "ast.h"
-#include "codegen/bytecode/gen.h"
-#include "codegen/bytecode/vm.h"
-#include "codegen/c/gen.h"
+// #include "codegen/bytecode/gen.h"
+// #include "codegen/bytecode/vm.h"
+// #include "codegen/c/gen.h"
 #include "compiler.h"
 #include "error.h"
 #include "parser.h"
@@ -49,127 +49,168 @@ MetagenOptions options = { 0 };
 
 typedef void (*CompilerPass)(Compiler *c, AstRoot *root);
 
-bool run_compiler_pass(Compiler *c, AstRoot *root, CompilerPass pass, char *name)
-{
-    LOG_DEBUG("Running compiler pass '%s'", name);
-    m_arena_clear(c->pass_arena);
-    pass(c, root);
-    return c->e->n_errors > 0;
-}
+// bool run_compiler_pass(Compiler *c, AstRoot *root, CompilerPass pass, char *name)
+// {
+//     LOG_DEBUG("Running compiler pass '%s'", name);
+//     m_arena_clear(c->pass_arena);
+//     pass(c, root);
+//     return c->e->n_errors > 0;
+// }
 
-u32 compile(char *file_name, Str8 source)
+u32 compile_file(char *file_name, Str8 source_code)
 {
-    Arena lex_arena;
-    Arena persist_arena; /* Data which should persist throughout the lifetime of the compiler */
-    Arena pass_arena; /* Data which that needs to persist for the lifetime of a compiler pass */
-    m_arena_init_dynamic(&lex_arena, 1, 512);
+    // Lex in its entirety
+    // Parse in its entirety
+    
+
+    /* Data which should persist throughout the lifetime of the compiler */
+    Arena persist_arena;
+    /* Arena for holding the syntax tree nodes */
+    Arena ast_arena;
+    /* Data which that needs to persist for the lifetime of a compiler pass */
+    Arena pass_arena;
     m_arena_init_dynamic(&persist_arena, 2, 512);
     m_arena_init_dynamic(&pass_arena, 1, 512);
 
+
     ErrorHandler e;
-    error_handler_init(&e, source.str, file_name);
+    error_handler_init(&e, source_code.str, file_name);
 
-    Compiler compiler = { .persist_arena = &persist_arena, .pass_arena = &pass_arena, .e = &e };
-    arraylist_init(&compiler.struct_types, sizeof(TypeInfoStruct *));
-    arraylist_init(&compiler.all_types, sizeof(TypeInfo *));
+    // Lex source_code -> tokens
+    // NOTE: This is allocated by lex_all, which is a bit opaque and bad
+    // Also, each token is linearly allocated at the arena, so maybe we can have a ArenaListView
+    // which is just a view into the arena?
+    ArrayList tokens = lex_all(&persist_arena, &e, (char *)source_code.str);
 
-    /* Frontend */
-    AstRoot *ast_root = parse(&persist_arena, &lex_arena, &e, (char *)source.str);
-    for (CompilerError *err = e.head; err != NULL; err = err->next) {
-        printf("%s\n", err->msg.str);
-    }
-    LOG_DEBUG("Parsing complete, %d errors", e.n_errors);
-    if (e.n_errors != 0) {
-        goto done;
-    }
-    if (options.parse_only) {
-        ArenaTmp tmp_arena = m_arena_tmp_init(compiler.persist_arena);
-        Str8Builder sb = make_str_builder(tmp_arena.arena);
-        ast_to_str(&sb, ast_root);
-        printf("%s\n", sb.str.str);
-        m_arena_tmp_release(tmp_arena);
-        goto done;
+    for (size_t i = 0; i < tokens.size; i++) {
+        Token *t = arraylist_get(&tokens, i);
+        token_print(*t);
     }
 
-    /*
-     * TODO: Right now we redo the middle in its entirety after compile time calls .
-     *       This is wasteful as most things remain the same. It also current leaks memory.
-     *       We want to do some kind of incremental typegen, infer and typecheck.
-     */
-    bool had_to_resolve;
-    do {
-        had_to_resolve = false;
-
-        /* Middle end */
-        if (run_compiler_pass(&compiler, ast_root, typegen, "typegen")) {
-            goto done;
-        }
-        if (run_compiler_pass(&compiler, ast_root, infer, "type infer")) {
-            goto done;
-        }
-        if (run_compiler_pass(&compiler, ast_root, typecheck, "typecheck")) {
-            goto done;
-        }
-
-        /* Find unresolved comptile time calls */
-        // TODO: Figure out order
-        for (AstListNode *node = ast_root->comptime_calls.head; node != NULL; node = node->next) {
-            had_to_resolve = true;
-
-            AstCall *call = AS_CALL(node->this);
-
-            Bytecode bytecode = ast_call_to_bytecode(compiler.symt_root, ast_root, call);
-            // disassemble(bytecode, source);
-            BytecodeWord result = run(&bytecode, false);
-            // TODO: Temporary assume result is an s32, turn it into a source literal
-            Str8Builder sb = make_str_builder(compiler.persist_arena);
-            str_builder_sprintf(&sb, "%d", 1, result);
-            str_builder_end(&sb, true);
-
-            // TODO: Figure out how to wrap properly
-            AstLiteral *literal = m_arena_alloc(compiler.persist_arena, sizeof(AstLiteral));
-            literal->kind = EXPR_LITERAL;
-            literal->lit_type = LIT_NUM;
-            literal->literal = sb.str;
-
-            call->is_resolved = true;
-            call->resolved_node = (AstNode *)literal;
-        }
-
-        // TEMPORARY
-        ast_root->comptime_calls.head = NULL;
-
-    } while (had_to_resolve);
-
-    /* Backend */
-    if (options.target == TARGET_BYTECODE) {
-        LOG_DEBUG_NOARG("Generating bytecode");
-        Bytecode bytecode = ast_root_to_bytecode(compiler.symt_root, ast_root);
-        if (options.debug_bytecode) {
-            disassemble(bytecode, source);
-        }
-        run(&bytecode, false);
-    } else {
-        LOG_DEBUG_NOARG("Generating c-code");
-        transpile_to_c(&compiler);
-        LOG_DEBUG_NOARG("Compiling c-code");
-        system("gcc out.c");
-        LOG_DEBUG_NOARG("Executing c-code");
-        system("./a.out");
-    }
-
-done:
+    // Parse tokens -> ast
+    
     for (CompilerError *err = e.head; err != NULL; err = err->next) {
         LOG_ERROR("%s", err->msg.str);
     }
-    // We could be "good citizens" and release the memory here, but the OS is going to do it
-    // anyways on the process terminating, so it doesn't really make a difference.
-    // arraylist_free ...
-    error_handler_release(&e);
-    m_arena_release(&persist_arena);
-    m_arena_release(&lex_arena);
-    return e.n_errors;
+
+
+    return 0;
 }
+
+// OLD
+// u32 compile(char *file_name, Str8 source)
+// {
+//     Arena lex_arena;
+//     Arena persist_arena; /* Data which should persist throughout the lifetime of the compiler */
+//     Arena pass_arena; /* Data which that needs to persist for the lifetime of a compiler pass */
+//     m_arena_init_dynamic(&lex_arena, 1, 512);
+//     m_arena_init_dynamic(&persist_arena, 2, 512);
+//     m_arena_init_dynamic(&pass_arena, 1, 512);
+// 
+//     ErrorHandler e;
+//     error_handler_init(&e, source.str, file_name);
+// 
+//     Compiler compiler = { .persist_arena = &persist_arena, .pass_arena = &pass_arena, .e = &e };
+//     arraylist_init(&compiler.struct_types, sizeof(TypeInfoStruct *));
+//     arraylist_init(&compiler.all_types, sizeof(TypeInfo *));
+// 
+//     /* Frontend */
+//     AstRoot *ast_root = parse(&persist_arena, &lex_arena, &e, (char *)source.str);
+//     for (CompilerError *err = e.head; err != NULL; err = err->next) {
+//         printf("%s\n", err->msg.str);
+//     }
+//     LOG_DEBUG("Parsing complete, %d errors", e.n_errors);
+//     if (e.n_errors != 0) {
+//         goto done;
+//     }
+//     if (options.parse_only) {
+//         ArenaTmp tmp_arena = m_arena_tmp_init(compiler.persist_arena);
+//         Str8Builder sb = make_str_builder(tmp_arena.arena);
+//         ast_to_str(&sb, ast_root);
+//         printf("%s\n", sb.str.str);
+//         m_arena_tmp_release(tmp_arena);
+//         goto done;
+//     }
+// 
+//     /*
+//      * TODO: Right now we redo the middle in its entirety after compile time calls .
+//      *       This is wasteful as most things remain the same. It also current leaks memory.
+//      *       We want to do some kind of incremental typegen, infer and typecheck.
+//      */
+//     bool had_to_resolve;
+//     do {
+//         had_to_resolve = false;
+// 
+//         /* Middle end */
+//         if (run_compiler_pass(&compiler, ast_root, typegen, "typegen")) {
+//             goto done;
+//         }
+//         if (run_compiler_pass(&compiler, ast_root, infer, "type infer")) {
+//             goto done;
+//         }
+//         if (run_compiler_pass(&compiler, ast_root, typecheck, "typecheck")) {
+//             goto done;
+//         }
+// 
+//         /* Find unresolved comptile time calls */
+//         // TODO: Figure out order
+//         for (AstListNode *node = ast_root->comptime_calls.head; node != NULL; node = node->next) {
+//             had_to_resolve = true;
+// 
+//             AstCall *call = AS_CALL(node->this);
+// 
+//             Bytecode bytecode = ast_call_to_bytecode(compiler.symt_root, ast_root, call);
+//             // disassemble(bytecode, source);
+//             BytecodeWord result = run(&bytecode, false);
+//             // TODO: Temporary assume result is an s32, turn it into a source literal
+//             Str8Builder sb = make_str_builder(compiler.persist_arena);
+//             str_builder_sprintf(&sb, "%d", 1, result);
+//             str_builder_end(&sb, true);
+// 
+//             // TODO: Figure out how to wrap properly
+//             AstLiteral *literal = m_arena_alloc(compiler.persist_arena, sizeof(AstLiteral));
+//             literal->kind = EXPR_LITERAL;
+//             literal->lit_type = LIT_NUM;
+//             literal->literal = sb.str;
+// 
+//             call->is_resolved = true;
+//             call->resolved_node = (AstNode *)literal;
+//         }
+// 
+//         // TEMPORARY
+//         ast_root->comptime_calls.head = NULL;
+// 
+//     } while (had_to_resolve);
+// 
+//     /* Backend */
+//     if (options.target == TARGET_BYTECODE) {
+//         LOG_DEBUG_NOARG("Generating bytecode");
+//         Bytecode bytecode = ast_root_to_bytecode(compiler.symt_root, ast_root);
+//         if (options.debug_bytecode) {
+//             disassemble(bytecode, source);
+//         }
+//         run(&bytecode, false);
+//     } else {
+//         LOG_DEBUG_NOARG("Generating c-code");
+//         transpile_to_c(&compiler);
+//         LOG_DEBUG_NOARG("Compiling c-code");
+//         system("gcc out.c");
+//         LOG_DEBUG_NOARG("Executing c-code");
+//         system("./a.out");
+//     }
+// 
+// done:
+//     for (CompilerError *err = e.head; err != NULL; err = err->next) {
+//         LOG_ERROR("%s", err->msg.str);
+//     }
+//     // We could be "good citizens" and release the memory here, but the OS is going to do it
+//     // anyways on the process terminating, so it doesn't really make a difference.
+//     // arraylist_free ...
+//     error_handler_release(&e);
+//     m_arena_release(&persist_arena);
+//     m_arena_release(&lex_arena);
+//     return e.n_errors;
+// }
 
 static void print_help(void)
 {
@@ -267,7 +308,8 @@ int main(int argc, char *argv[])
     }
     fclose(fp);
 
-    u32 n_errors = compile(input_file, (Str8){ .str = (u8 *)input, .len = input_size });
+    //u32 n_errors = compile(input_file, (Str8){ .str = (u8 *)input, .len = input_size });
+    u32 n_errors = compile_file(input_file, (Str8){ .str = (u8 *)input, .len = input_size });
     free(input);
     if (n_errors == 0) {
         return 0;
