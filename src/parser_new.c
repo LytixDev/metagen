@@ -109,55 +109,53 @@ static bool is_relation_op(Token token)
     }
 }
 
-// static Token consume_or_err(Parser *parser, TokenKind expected, char *msg)
-// {
-//     Token token = peek_token(parser);
-//     if (token.kind != expected) {
-//         error_parse(parser->lexer.e, msg, token);
-//         return (Token){ .kind = TOKEN_ERR };
-//     }
-//     next_token(parser);
-//     return token;
-// }
-// 
-// static AstTypeInfo parse_type(Parser *parser, bool allow_array_types)
-// {
-//     consume_or_err(parser, TOKEN_COLON, "Expected ':' after declaration to denote type");
-// 
-//     u32 pointer_indirection = 0;
-//     while (match_token(parser, TOKEN_CARET))
-//         pointer_indirection++;
-// 
-//     Token name = consume_or_err(parser, TOKEN_IDENTIFIER, "Expected typename after ':'");
-//     if (!match_token(parser, TOKEN_LBRACKET)) {
-//         return (AstTypeInfo){ .name = name.lexeme,
-//                               .is_array = false,
-//                               .pointer_indirection = pointer_indirection };
-//     }
-//     if (!allow_array_types) {
-//         consume_or_err(parser, TOKEN_RBRACKET, "Local arrays are not allowed");
-//         return (AstTypeInfo){ .name = name.lexeme,
-//                               .is_array = false,
-//                               .pointer_indirection = pointer_indirection };
-//     }
-// 
-//     s32 elements = -1;
-//     Token peek = peek_token(parser);
-//     if (peek.kind == TOKEN_NUM) {
-//         next_token(parser);
-//         bool parsed_success;
-//         elements = str_view_to_u32(peek.lexeme, &parsed_success);
-//         if (!parsed_success) {
-//             error_parse(parser->lexer.e, "Could not be parsed as a u32", peek);
-//         }
-//     }
-//     consume_or_err(parser, TOKEN_RBRACKET, "Expected ']' to terminate the array type");
-//     return (AstTypeInfo){ .name = name.lexeme,
-//                           .is_array = true,
-//                           .elements = elements,
-//                           .pointer_indirection = pointer_indirection };
-// }
-// 
+static Token consume_or_err(Parser *parser, TokenKind expected, char *msg)
+{
+    Token token = peek_token(parser);
+    if (token.kind != expected) {
+        error_parse(parser->e, msg, token);
+        return (Token){ .kind = TOKEN_ERR };
+    }
+    next_token(parser);
+    return token;
+}
+
+static TypeInfoRaw parse_type_raw(Parser *parser, bool allow_array_types)
+{
+    consume_or_err(parser, TOKEN_COLON, "Expected ':' after declaration to denote type");
+
+    u32 pointer_indirection = 0;
+    while (match_token(parser, TOKEN_CARET)) pointer_indirection++;
+
+    Token type_name = consume_or_err(parser, TOKEN_IDENTIFIER, "Expected typename after ':'");
+    if (!match_token(parser, TOKEN_LBRACKET)) {
+        return (TypeInfoRaw){ .type_name = type_name.lexeme, 
+                              .is_array = false, .pointer_indirection = pointer_indirection };
+    }
+    if (!allow_array_types) {
+        consume_or_err(parser, TOKEN_RBRACKET, "Local arrays are not allowed");
+        return (TypeInfoRaw){ .type_name = type_name.lexeme, 
+                              .is_array = false, .pointer_indirection = pointer_indirection };
+    }
+
+    s32 array_elements = -1;
+    Token peek = peek_token(parser);
+    if (peek.kind == TOKEN_NUM) {
+        next_token(parser);
+        bool parsed_success;
+        // TODO: We should have a better system for this.
+        array_elements = str_view_to_u32(peek.lexeme, &parsed_success);
+        if (!parsed_success) {
+            error_parse(parser->e, "Could not be parsed as a u32", peek);
+        }
+    }
+    consume_or_err(parser, TOKEN_RBRACKET, "Expected ']' to terminate the array type");
+    return (TypeInfoRaw){ .type_name = type_name.lexeme, 
+                          .is_array = false,
+                          .array_elements = array_elements,
+                          .pointer_indirection = pointer_indirection };
+}
+
 // static AstCall *parse_call(Parser *parser, Token identifier, bool is_comptime)
 // {
 //     /* Came from TOKEN_IDENTIFIER and then peeked TOKEN_LPAREN */
@@ -617,39 +615,34 @@ static void init_operator_precedence(void)
     operator_precedence[TOKEN_DOT] = 15;
 }
 
-/*
- * TypedLiteral -> IDENT ':' IDENT (= LIT)?
- */
-static TypedLiteral parse_typed_literal(Parser *parser)
+static AstNode *parse_var_decl(Parser *parser)
 {
+    Token identifier = consume_or_err(parser, TOKEN_IDENTIFIER, "Expected variable name");
+    TypeInfoRaw raw_type = parse_type_raw(parser, true);
+    TypedLiteral typed_lit = { .raw_type = raw_type, .lit_type = LIT_NONE };
+    if (match_token(parser, TOKEN_EQ)) {
+        // TODO: This is insufficient once we get more complex literals
+        Token literal = next_token(parser);
+        // TODO: Assuming literal is number
+        assert(literal.kind == TOKEN_NUM);
+        typed_lit.literal = literal.lexeme;
+        typed_lit.lit_type = LIT_NUM;
+    }
+
+    AstNode *node = alloc_ast_node(parser->arena, AST_VAR);
+    node->var.identifier = identifier;
+    node->var.typed_lit = typed_lit;
+    return node;
 }
-// {
-//     TypedIdentList typed_vars = { .vars = m_arena_alloc_struct(parser->arena, TypedIdent),
-//                                   .len = 0 };
-// 
-//     TypedIdent *indices_head = typed_vars.vars;
-//     do {
-//         /*
-//          * If not first iteration of loop then we need to consume the comma we already peeked and
-//          * allocate space for the next identifier.
-//          */
-//         if (typed_vars.len != 0) {
-//             next_token(parser);
-//             indices_head = m_arena_alloc_struct(parser->arena, TypedIdent);
-//         }
-//         Token identifier = consume_or_err(parser, TOKEN_IDENTIFIER, "Expected variable name");
-//         AstTypeInfo type_info = { 0 };
-//         if (typed) {
-//             type_info = parse_type(parser, allow_array_types);
-//         }
-//         TypedIdent new = { .name = identifier.lexeme, .ast_type_info = type_info };
-//         /* Alloc space for next TypedVar, store current, update len and head */
-//         *indices_head = new;
-//         typed_vars.len++;
-//     } while (peek_token(parser).kind == TOKEN_COMMA);
-// 
-//     return typed_vars;
-// }
+
+static AstNode *parse_func(Parser *parser)
+{
+    Token identifier = consume_or_err(parser, TOKEN_IDENTIFIER, "Expected function name");
+    consume_or_err(parser, TOKEN_LPAREN, "Expected '(' to start function parameter list");
+
+    AstNode *node = alloc_ast_node(parser->arena, AST_FUNC);
+    return node;
+}
 
 static AstRoot *parse_root(Parser *parser)
 {
@@ -660,11 +653,16 @@ static AstRoot *parse_root(Parser *parser)
     arraylist_init(&root->global_enums, sizeof(AstNode *));
     arraylist_init(&root->comptime_calls, sizeof(AstNode *));
 
-
     Token next;
     while ((next = next_token(parser)).kind != TOKEN_EOF) {
         switch (next.kind) {
         case TOKEN_VAR: {
+            AstNode *var = parse_var_decl(parser);
+            arraylist_append(&root->global_variables, &var);
+        }; break;
+        case TOKEN_FUNC: {
+            AstNode *func = parse_func(parser);
+            arraylist_append(&root->global_functions, &func);
         }; break;
         default: {
             error_parse(parser->e, "Illegal first token. Expected var, struct or func", next);

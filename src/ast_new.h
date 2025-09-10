@@ -28,8 +28,8 @@ typedef struct type_info_t TypeInfo; // forward from type.h
 typedef struct {
     Str8 type_name;
     bool is_array;
-    s32 num_elements;
-    s32 num_pointer_indirection; // 0 means that this is not a pointer
+    s32 array_elements;
+    s32 pointer_indirection; // 0 means that this is not a pointer
 } TypeInfoRaw;
 
 typedef enum {
@@ -37,10 +37,11 @@ typedef enum {
     LIT_STR,
     LIT_NUM,
     LIT_NULL,
+    LIT_NONE,
 } LiteralType;
 
 typedef struct {
-    TypeInfoRaw type_raw;
+    TypeInfoRaw raw_type;
     LiteralType lit_type;
     Str8View literal; // Guranteed to be zero-terminated for STR and IDENT aka Str8
 } TypedLiteral;
@@ -64,6 +65,7 @@ typedef enum {
     AST_FUNC,
     AST_STRUCT,
     AST_ENUM,
+    AST_VAR,
 
     AST_ROOT,
 
@@ -148,6 +150,11 @@ typedef struct {
     TypedLiteralList members;
 } AstEnum;
 
+typedef struct {
+    Token identifier;
+    TypedLiteral typed_lit;
+} AstVar;
+
 struct ast_node_t {
     AstKind kind;
     Token start;
@@ -170,6 +177,7 @@ struct ast_node_t {
         AstFunc func;
         AstStruct struct_;
         AstEnum enum_;
+        AstVar var;
     };
 };
 
@@ -186,7 +194,11 @@ typedef struct {
 
 AstNode *alloc_ast_node(Arena *arena, AstKind kind);
 
-void ast_to_dot(AstNode *node);
+void ast_to_dot(Str8Builder *sb, AstNode *node);
+void ast_to_str(Str8Builder *sb, AstNode *root);
 
+#define AS_ROOT(___node) ((AstRoot *)(___node))
+
+// I want some kind of for_each_children macro
 
 #endif /* AST_NEW_H */

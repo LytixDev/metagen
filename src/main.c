@@ -80,7 +80,20 @@ u32 compile_file(char *file_name, Str8 source_code)
     // which is just a view into the arena?
     ArrayList tokens = lex_all(&persist_arena, &e, (char *)source_code.str);
 
-    AstRoot *root = parse(&persist_arena, tokens, &e);
+    AstRoot *ast_root = parse(&persist_arena, tokens, &e);
+
+    ArenaTmp tmp_arena = m_arena_tmp_init(&persist_arena);
+    Str8Builder sb = make_str_builder(tmp_arena.arena);
+    ast_to_str(&sb, (AstNode *)ast_root);
+    printf("%s\n", sb.str.str);
+    m_arena_tmp_release(tmp_arena);
+
+    /*
+    sb = make_str_builder(tmp_arena.arena);
+    ast_to_dot(&sb, (AstNode *)ast_root);
+    printf("%s\n", sb.str.str);
+    m_arena_tmp_release(tmp_arena);
+    */
 
     // Parse tokens -> ast
     
